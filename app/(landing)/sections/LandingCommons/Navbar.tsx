@@ -1,63 +1,9 @@
 "use client"
-import { usePathname, useRouter } from "next/navigation";
-import NavLink from "./NavLink";
 import Image from "next/image";
 import Link from "next/link";
 
 const LandingNavbar = () => {
-  const pathname = usePathname();
-  const router = useRouter();
-
-  const isSelected = (path: string) => pathname === path;
-
-  const handleLogout = () => {
-    // Add your logout logic here
-    console.log("Logging out...");
-    router.push('/auth/login');
-  };
-
-  const authLinks = (isMobile: boolean) => (
-    <>
-      <NavLink
-        isSelected={isSelected('/dashboard')}
-        isMobile={isMobile}
-        href='/dashboard'
-      >
-        Dashboard
-      </NavLink>
-      <NavLink
-        isSelected={isSelected('/settings')}
-        isMobile={isMobile}
-        href='/settings'
-      >
-        Settings
-      </NavLink>
-      <NavLink isMobile={isMobile} onClick={handleLogout}>
-        Logout
-      </NavLink>
-    </>
-  );
-
-  const guestLinks = (isMobile: boolean) => (
-    <>
-      <NavLink
-        isSelected={isSelected('/auth/login')}
-        isMobile={isMobile}
-        href="/auth/login"
-      >
-        Login
-      </NavLink>
-      <NavLink
-        isSelected={isSelected('/auth/register')}
-        isMobile={isMobile}
-        href="/auth/register"
-      >
-        Register
-      </NavLink>
-    </>
-  );
-
-  const isAuthenticated = false;
+ 
 
   return (
       <header className="sticky top-0 z-20 backdrop-blur-sm">

@@ -1,7 +1,9 @@
+"use client"
 import workStation1 from '@/public/assets/images/workstation1.jpg'
 import workStation2 from '@/public/assets/images/workstation2.jpg'
 import Image from 'next/image'
 import ArrowRight from "@/public/assets/icons/right-arrow.svg"
+import {motion} from "framer-motion"
 
 export default function Hero() {
     return (
@@ -27,7 +29,17 @@ export default function Hero() {
                         </div>
                     </div>
                     <div className="mt-20 md:mt-0 md:h-[640px] md:flex-1 relative">
-                        <Image src={workStation1} alt="workstation" className='md:absolute md:h-full md:w-auto md:max-w-none md:left-6 lg:left-0 '  />
+                        <motion.img 
+                            animate={{
+                                translateY: [-30, 30]
+                            }}
+                            transition={{
+                                repeat: Infinity,
+                                repeatType: "mirror",
+                                duration: 3,
+                                ease: "easeInOut"
+                            }}
+                            src={workStation1.src} alt="workstation" className='md:absolute md:h-full md:w-auto md:max-w-none md:left-6 lg:left-0 '  />
                         <Image src={workStation2} width={220} height={220} alt="workstation2" className='hidden md:block -top-8 -left-32 md:absolute'  />
                         <Image src={workStation2} width={220} height={220} alt="workstation2" className='hidden lg:block top-[524px] left-[448px] absolute rotate-[30deg]'  />
                     </div>

@@ -9,7 +9,7 @@ export default function LandingPageLayout ({
 
 
     return (
-        <div className="overflow-x-hidden">
+        <div className="">
             <LandingNavbar />
             <main className="">
             {children}

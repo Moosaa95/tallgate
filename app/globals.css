@@ -2,7 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 font-medium tracking-tight text-white bg-black rounded-lg transition duration-300
+  }
+  .btn-primary {
+    @apply bg-black text-white
+  }
+  .btn-text {
+    @apply text-black bg-transparent
+  }
+  .logo-ticker {
+    @apply w-auto h-8;
+  }
+
+  .tag {
+    @apply text-black text-sm inline-flex border border-[#222]/10 px-3 py-1 rounded-lg tracking-tight
+  }
+
+  .section-title {
+    @apply text-center text-3xl md:text-[54px] md:leading-[60px] font-bold tracking-tighter bg-gradient-to-b from-black to-[#001E80] text-transparent bg-clip-text
+  }
+  .section-description {
+    @apply text-center text-[22px] leading-[30px] tracking-tight text-[#010D3E]
+  }
+  .section-heading {
+    @apply max-w-[540px] mx-auto
+  }
+
+}
+
+
+
+/* :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
@@ -30,4 +62,4 @@ body {
   .text-balance {
     text-wrap: balance;
   }
-}
+} */

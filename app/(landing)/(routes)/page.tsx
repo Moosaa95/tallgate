@@ -10,7 +10,7 @@ const LandingPage = () => {
   return (
     <div>
       <Hero />
-      <LogoTicker />
+      {/* <LogoTicker /> */}
       <ProductShow />
       <Pricing />
       <Testimonials />

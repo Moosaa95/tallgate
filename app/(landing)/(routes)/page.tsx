@@ -13,7 +13,7 @@ const LandingPage = () => {
       {/* <LogoTicker /> */}
       <ProductShow />
       <Pricing />
-      <Testimonials />
+      {/* <Testimonials /> */}
       <CallToAction />
       <Footer />
     </div>

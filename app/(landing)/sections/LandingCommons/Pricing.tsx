@@ -178,122 +178,265 @@
 //     );
 // }
 
+// "use client"
+// import { twMerge } from "tailwind-merge";
+// import {motion} from "framer-motion"
 
+// const courses = [
+//     {
+//         title: "Computer Basic",
+//         description: "Perfect for beginners, this course covers essential computer operations, internet navigation, and basic software usage.",
+//         monthlyPrice: "20,000",
+//         buttonText: "Enroll Now",
+//         popular: false
+//     },
+//     {
+//         title: "Programming Languages",
+//         description: "Learn popular programming languages like Python, Java, C++, and more. Our courses range from introductory to advanced levels.",
+//         monthlyPrice: "50,000",
+//         buttonText: "Enroll Now",
+//         popular: true
+//     },
+//     {
+//         title: "Web Development",
+//         description: "Dive into the world of web development with courses on HTML, CSS, JavaScript, and modern frameworks like React and Angular.",
+//         monthlyPrice: "50,000",
+//         buttonText: "Enroll Now",
+//         popular: true
+//     },
+//     // {
+//     //     title: "Data Science and Analytics",
+//     //     description: "Gain proficiency in data analysis, machine learning, and big data technologies to stay ahead in the data-driven industry.",
+//     //     monthlyPrice: "60,000",
+//     //     buttonText: "Enroll Now",
+//     //     popular: false
+//     // },
+//     // {
+//     //     title: "Cybersecurity",
+//     //     description: "Equip yourself with the knowledge to protect systems and data with our comprehensive cybersecurity courses.",
+//     //     monthlyPrice: "55,000",
+//     //     buttonText: "Enroll Now",
+//     //     popular: false
+//     // },
+//     {
+//         title: "Desktop Publishing",
+//         description: "Learn to create professional documents and publications using tools like Adobe InDesign, Microsoft Publisher, and more.",
+//         monthlyPrice: "35,000",
+//         buttonText: "Enroll Now",
+//         popular: false
+//     },
+//     {
+//         title: "Digital Literacy",
+//         description: "Build a strong foundation in navigating digital environments, using internet resources, and understanding digital etiquette.",
+//         monthlyPrice: "25,000",
+//         buttonText: "Enroll Now",
+//         popular: false
+//     },
+//     // {
+//     //     title: "Software & Security",
+//     //     description: "Understand software development and security practices to ensure robust and secure applications.",
+//     //     monthlyPrice: "55,000",
+//     //     buttonText: "Enroll Now",
+//     //     popular: false
+//     // },
+//     {
+//         title: "Graphic Design",
+//         description: "Explore the world of graphic design with courses in Adobe Photoshop, Illustrator, and other design tools.",
+//         monthlyPrice: "50,000",
+//         buttonText: "Enroll Now",
+//         popular: false
+//     },
+//     // {
+//     //     title: "Computer Networking",
+//     //     description: "Master the principles of networking, including setup, configuration, and troubleshooting of network systems.",
+//     //     monthlyPrice: "50,000",
+//     //     buttonText: "Enroll Now",
+//     //     popular: false
+//     // }
+// ];
+
+// export default function Courses() {
+//     return (
+//         <section className="py-24 bg-gray-100">
+//             <div className="container px-4 mx-auto">
+//                 <div className="text-center section-heading">
+//                     <h2 className="text-4xl font-bold section-title">Our Courses</h2>
+//                     <p className="mt-5 text-lg text-gray-600">Explore a variety of courses tailored to boost your skills and knowledge.</p>
+//                 </div>
+//                 <div className="flex flex-col items-center gap-6 mt-10 md:flex-row md:flex-wrap md:justify-center">
+//                     {courses.map(({ title, description, monthlyPrice, buttonText, popular }, index) => (
+//                         <div key={index} className={twMerge(
+//                             "p-10 border border-[#F1F1F1] rounded-3xl shadow-[0_7px_14px_#EAEAEA] max-w-xs w-full bg-white",
+//                             popular && "border-black bg-black text-white"
+//                         )}>
+//                             <div className="flex items-center justify-between">
+//                                 <h3 className={twMerge("text-lg font-bold", popular ? "text-white/60" : "text-gray-800")}>
+//                                     {title}
+//                                 </h3>
+//                                 {popular && (
+//                                     <div className="inline-flex items-center text-sm px-4 py-1.5 rounded-xl border border-white/20">
+//                                         <motion.span  
+//                                             animate={{
+//                                                 backgroundPositionX: '100%'
+//                                             }}
+//                                             transition={{
+//                                                 duration:1,
+//                                                 repeat: Infinity,
+//                                                 ease: 'linear',
+//                                                 repeatType: "loop"
+//                                             }}
+//                                             className="bg-[linear-gradient(to_right,#DD7DDF,#E1CD86,#BBCB92,#71C2Ef,#3BFFFF,#DD7DDF)] [background-size:200%] text-transparent bg-clip-text font-medium">
+                                                
+//                                             Popular
+                                            
+//                                         </motion.span>
+//                                     </div>
+//                                 )}
+//                             </div>
+//                             <p className={twMerge("mt-4 text-sm", popular ? "text-white/80" : "text-gray-600")}>
+//                                 {description}
+//                             </p>
+//                             <div className="flex items-baseline gap-1 mt-6">
+//                                 <span className={twMerge("text-4xl font-bold leading-none tracking-tighter", popular && "text-white/80")}>₦{monthlyPrice}</span>
+//                                 <span className={twMerge("font-medium tracking-tight", popular ? "text-white/60" : "text-gray-600")}>/month</span>
+//                             </div>
+//                             {/* <button className={twMerge(
+//                                 "w-full btn btn-primary mt-8 transition-transform transform hover:scale-105",
+//                                 popular ? "bg-white text-black hover:bg-gray-300" : "bg-[#768de0] text-white hover:bg-[#5a6dbd]"
+//                             )}>
+//                                 {buttonText}
+//                             </button> */}
+//                         </div>
+//                     ))}
+//                 </div>
+//             </div>
+//         </section>
+//     );
+// }
+
+"use client"
 import { twMerge } from "tailwind-merge";
+import { motion } from "framer-motion";
 
 const courses = [
     {
-        title: "Computer Basic",
-        description: "Perfect for beginners, this course covers essential computer operations, internet navigation, and basic software usage.",
-        monthlyPrice: "20,000",
-        buttonText: "Enroll Now",
-        popular: false
+        category: "Introductory",
+        courses: [
+            {
+                title: "Computer Basic",
+                description: "Perfect for beginners, this course covers essential computer operations, internet navigation, and basic software usage.",
+                monthlyPrice: "20,000",
+                buttonText: "Enroll Now",
+                popular: false
+            },
+            {
+                title: "Digital Literacy",
+                description: "Build a strong foundation in navigating digital environments, using internet resources, and understanding digital etiquette.",
+                monthlyPrice: "25,000",
+                buttonText: "Enroll Now",
+                popular: false
+            }
+        ]
     },
     {
-        title: "Programming Languages",
-        description: "Learn popular programming languages like Python, Java, C++, and more. Our courses range from introductory to advanced levels.",
-        monthlyPrice: "50,000",
-        buttonText: "Enroll Now",
-        popular: true
+        category: "Core Skills",
+        courses: [
+            {
+                title: "Web Development",
+                description: "Dive into the world of web development with courses on HTML, CSS, JavaScript, and modern frameworks like React and Angular.",
+                monthlyPrice: "50,000",
+                buttonText: "Enroll Now",
+                popular: true
+            },
+            {
+                title: "Programming Languages",
+                description: "Learn popular programming languages like Python, Java, C++, and more. Our courses range from introductory to advanced levels.",
+                monthlyPrice: "50,000",
+                buttonText: "Enroll Now",
+                popular: true
+            }
+        ]
     },
     {
-        title: "Web Development",
-        description: "Dive into the world of web development with courses on HTML, CSS, JavaScript, and modern frameworks like React and Angular.",
-        monthlyPrice: "50,000",
-        buttonText: "Enroll Now",
-        popular: true
-    },
-    // {
-    //     title: "Data Science and Analytics",
-    //     description: "Gain proficiency in data analysis, machine learning, and big data technologies to stay ahead in the data-driven industry.",
-    //     monthlyPrice: "60,000",
-    //     buttonText: "Enroll Now",
-    //     popular: false
-    // },
-    // {
-    //     title: "Cybersecurity",
-    //     description: "Equip yourself with the knowledge to protect systems and data with our comprehensive cybersecurity courses.",
-    //     monthlyPrice: "55,000",
-    //     buttonText: "Enroll Now",
-    //     popular: false
-    // },
-    {
-        title: "Desktop Publishing",
-        description: "Learn to create professional documents and publications using tools like Adobe InDesign, Microsoft Publisher, and more.",
-        monthlyPrice: "35,000",
-        buttonText: "Enroll Now",
-        popular: false
-    },
-    {
-        title: "Digital Literacy",
-        description: "Build a strong foundation in navigating digital environments, using internet resources, and understanding digital etiquette.",
-        monthlyPrice: "25,000",
-        buttonText: "Enroll Now",
-        popular: false
-    },
-    // {
-    //     title: "Software & Security",
-    //     description: "Understand software development and security practices to ensure robust and secure applications.",
-    //     monthlyPrice: "55,000",
-    //     buttonText: "Enroll Now",
-    //     popular: false
-    // },
-    {
-        title: "Graphic Design",
-        description: "Explore the world of graphic design with courses in Adobe Photoshop, Illustrator, and other design tools.",
-        monthlyPrice: "50,000",
-        buttonText: "Enroll Now",
-        popular: false
-    },
-    // {
-    //     title: "Computer Networking",
-    //     description: "Master the principles of networking, including setup, configuration, and troubleshooting of network systems.",
-    //     monthlyPrice: "50,000",
-    //     buttonText: "Enroll Now",
-    //     popular: false
-    // }
+        category: "Creative Skills",
+        courses: [
+            {
+                title: "Graphic Design",
+                description: "Explore the world of graphic design with courses in Adobe Photoshop, Illustrator, and other design tools.",
+                monthlyPrice: "50,000",
+                buttonText: "Enroll Now",
+                popular: false
+            },
+            {
+                title: "Desktop Publishing",
+                description: "Learn to create professional documents and publications using tools like Adobe InDesign, Microsoft Publisher, and more.",
+                monthlyPrice: "35,000",
+                buttonText: "Enroll Now",
+                popular: false
+            }
+        ]
+    }
 ];
 
 export default function Courses() {
     return (
-        <section className="py-24 bg-gray-100">
+        <section className="py-24 bg-gray-100" id="courses">
             <div className="container px-4 mx-auto">
                 <div className="text-center section-heading">
                     <h2 className="text-4xl font-bold section-title">Our Courses</h2>
                     <p className="mt-5 text-lg text-gray-600">Explore a variety of courses tailored to boost your skills and knowledge.</p>
                 </div>
-                <div className="flex flex-col items-center gap-6 mt-10 md:flex-row md:flex-wrap md:justify-center">
-                    {courses.map(({ title, description, monthlyPrice, buttonText, popular }, index) => (
-                        <div key={index} className={twMerge(
-                            "p-10 border border-[#F1F1F1] rounded-3xl shadow-[0_7px_14px_#EAEAEA] max-w-xs w-full bg-white",
-                            popular && "border-black bg-black text-white"
-                        )}>
-                            <div className="flex items-center justify-between">
-                                <h3 className={twMerge("text-lg font-bold", popular ? "text-white/60" : "text-gray-800")}>
-                                    {title}
-                                </h3>
-                                {popular && (
-                                    <div className="inline-flex items-center text-sm px-4 py-1.5 rounded-xl border border-white/20">
-                                        <span className="bg-[linear-gradient(to_right,#DD7DDF,#E1CD86,#BBCB92,#71C2Ef,#3BFFFF,#DD7DDF)] text-transparent bg-clip-text font-medium">Popular</span>
+                {courses.map(({ category, courses }, categoryIndex) => (
+                    <div key={categoryIndex} className="mt-12">
+                        <h3 className="text-2xl section-title">{category}</h3>
+                        <div className="flex flex-col items-center gap-6 mt-6 md:flex-row md:flex-wrap md:justify-center">
+                            {courses.map(({ title, description, monthlyPrice, buttonText, popular }, index) => (
+                                <div key={index} className={twMerge(
+                                    "p-10 border border-[#F1F1F1] rounded-3xl shadow-[0_7px_14px_#EAEAEA] max-w-xs w-full bg-white",
+                                    popular && "border-black bg-black text-white"
+                                )}>
+                                    <div className="flex items-center justify-between">
+                                        <h3 className={twMerge("text-lg font-bold", popular ? "text-white/60" : "text-gray-800")}>
+                                            {title}
+                                        </h3>
+                                        {popular && (
+                                            <div className="inline-flex items-center text-sm px-4 py-1.5 rounded-xl border border-white/20">
+                                                <motion.span  
+                                                    animate={{
+                                                        backgroundPositionX: '100%'
+                                                    }}
+                                                    transition={{
+                                                        duration: 1,
+                                                        repeat: Infinity,
+                                                        ease: 'linear',
+                                                        repeatType: "loop"
+                                                    }}
+                                                    className="bg-[linear-gradient(to_right,#DD7DDF,#E1CD86,#BBCB92,#71C2Ef,#3BFFFF,#DD7DDF)] [background-size:200%] text-transparent bg-clip-text font-medium">
+                                                    
+                                                    Popular
+                                                    
+                                                </motion.span>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                            <p className={twMerge("mt-4 text-sm", popular ? "text-white/80" : "text-gray-600")}>
-                                {description}
-                            </p>
-                            <div className="flex items-baseline gap-1 mt-6">
-                                <span className={twMerge("text-4xl font-bold leading-none tracking-tighter", popular && "text-white/80")}>₦{monthlyPrice}</span>
-                                <span className={twMerge("font-medium tracking-tight", popular ? "text-white/60" : "text-gray-600")}>/month</span>
-                            </div>
-                            {/* <button className={twMerge(
-                                "w-full btn btn-primary mt-8 transition-transform transform hover:scale-105",
-                                popular ? "bg-white text-black hover:bg-gray-300" : "bg-[#768de0] text-white hover:bg-[#5a6dbd]"
-                            )}>
-                                {buttonText}
-                            </button> */}
+                                    <p className={twMerge("mt-4 text-sm", popular ? "text-white/80" : "text-gray-600")}>
+                                        {description}
+                                    </p>
+                                    <div className="flex items-baseline gap-1 mt-6">
+                                        <span className={twMerge("text-4xl font-bold leading-none tracking-tighter", popular && "text-white/80")}>₦{monthlyPrice}</span>
+                                        <span className={twMerge("font-medium tracking-tight", popular ? "text-white/60" : "text-gray-600")}>/month</span>
+                                    </div>
+                                    {/* <button className={twMerge(
+                                        "w-full btn btn-primary mt-8 transition-transform transform hover:scale-105",
+                                        popular ? "bg-white text-black hover:bg-gray-300" : "bg-[#768de0] text-white hover:bg-[#5a6dbd]"
+                                    )}>
+                                        {buttonText}
+                                    </button> */}
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
+                    </div>
+                ))}
             </div>
         </section>
     );

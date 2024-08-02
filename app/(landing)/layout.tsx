@@ -11,7 +11,7 @@ export default function LandingPageLayout ({
     return (
         <div className="">
             <LandingNavbar />
-            <main className="">
+            <main className="overflow-x-hidden overflow-y-scroll scrollbar scrollbar-track-textDark/20 scrollbar-thumb-textDark/60">
             {children}
             </main>
         </div>

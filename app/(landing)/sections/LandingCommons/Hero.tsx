@@ -15,9 +15,8 @@ export default function Hero() {
 
     const translateY = useTransform(scrollYProgress, [0,1], [150, -150])
 
-    // useMotionValueEvent(scrollYProgress, 'change', (latestValue) => )
     return (
-        <section ref={heroRef} className="pt-8 px-4 pb-20 md:pt-5 md:pb-10 bg-[radial-gradient(ellipse_200%_100%_at_bottom_left,#183EC2,#EAEEFE_100%)] overflow-x-clip md:overflow-hidden">
+        <section id="home" ref={heroRef} className="pt-8 px-4 pb-20 md:pt-5 md:pb-10 bg-[radial-gradient(ellipse_200%_100%_at_bottom_left,#183EC2,#EAEEFE_100%)] overflow-x-clip md:overflow-hidden">
             <div className="container">
                 <div className='items-center justify-between gap-6 md:flex'>
                     <div className='md:w-[678px]'>

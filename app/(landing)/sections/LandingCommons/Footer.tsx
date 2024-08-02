@@ -14,8 +14,7 @@ export default function Footer() {
                 </div>
                 <nav className="flex flex-col gap-6 mt-6 md:flex-row md:justify-center">
                     <a href="#">About</a>
-                    <a href="#">Features</a>
-                    <a href="#">Customers</a>
+                    <a href="#courses">Courses</a>
                 </nav>
                 <div className="flex flex-row justify-center gap-6 mt-6">
                 <a href="#"><X className="w-10 h-10 cursor-pointer" /></a>

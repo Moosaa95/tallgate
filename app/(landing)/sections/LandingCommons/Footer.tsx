@@ -5,6 +5,10 @@ import LinkedIn from "@/public/assets/icons/linkedin-svgrepo.svg"
 import Insta from "@/public/assets/icons/instagram-1-svgrepo-com.svg"
 import Whatsapp from "@/public/assets/icons/whatsapp-color-svgrepo-co.svg"
 
+const whatsappNumber = '+2349052440452';
+const instagram = "https://www.instagram.com/tallgate_computing_enterprise/"
+
+
 export default function Footer() {
     return (
         <footer className="bg-black text-[#bcbcbc] text-sm py-10 text-center">
@@ -19,8 +23,8 @@ export default function Footer() {
                 <div className="flex flex-row justify-center gap-6 mt-6">
                 <a href="#"><X className="w-10 h-10 cursor-pointer" /></a>
                 <a href="#"><LinkedIn className="w-10 h-10 cursor-pointer" /></a>
-                <a href="#"><Insta className="w-10 h-10 cursor-pointer"/></a>
-                <a href="#"><Whatsapp className="w-10 h-10 cursor-pointer" /></a>
+                <a href={instagram}><Insta className="w-10 h-10 cursor-pointer"/></a>
+                <a href={`https://wa.me/${whatsappNumber}`}><Whatsapp className="w-10 h-10 cursor-pointer" /></a>
                 </div>
                 <p className="mt-6">&copy; 2024 TallGate Enterprise</p>
             </div>

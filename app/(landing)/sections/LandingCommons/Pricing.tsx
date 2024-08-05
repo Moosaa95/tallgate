@@ -204,6 +204,7 @@
 //         buttonText: "Enroll Now",
 //         popular: true
 //     },
+
 //     // {
 //     //     title: "Data Science and Analytics",
 //     //     description: "Gain proficiency in data analysis, machine learning, and big data technologies to stay ahead in the data-driven industry.",
@@ -218,6 +219,7 @@
 //     //     buttonText: "Enroll Now",
 //     //     popular: false
 //     // },
+        
 //     {
 //         title: "Desktop Publishing",
 //         description: "Learn to create professional documents and publications using tools like Adobe InDesign, Microsoft Publisher, and more.",
@@ -246,13 +248,13 @@
 //         buttonText: "Enroll Now",
 //         popular: false
 //     },
-//     // {
-//     //     title: "Computer Networking",
-//     //     description: "Master the principles of networking, including setup, configuration, and troubleshooting of network systems.",
-//     //     monthlyPrice: "50,000",
-//     //     buttonText: "Enroll Now",
-//     //     popular: false
-//     // }
+    // {
+    //     title: "Computer Networking",
+    //     description: "Master the principles of networking, including setup, configuration, and troubleshooting of network systems.",
+    //     monthlyPrice: "50,000",
+    //     buttonText: "Enroll Now",
+    //     popular: false
+    // }
 // ];
 
 // export default function Courses() {
@@ -354,7 +356,28 @@ const courses = [
                 monthlyPrice: "50,000",
                 buttonText: "Enroll Now",
                 popular: true
-            }
+            },
+            {
+                title: "Computer Networking",
+                description: "Master the principles of networking, including setup, configuration, and troubleshooting of network systems.",
+                monthlyPrice: "50,000",
+                buttonText: "Enroll Now",
+                popular: false
+            },
+            {
+                title: "Cybersecurity",
+                description: "Equip yourself with the knowledge to protect systems and data with our comprehensive cybersecurity courses.",
+                monthlyPrice: "55,000",
+                buttonText: "Enroll Now",
+                popular: true
+            },
+            {
+            title: "Software & Security",
+            description: "Understand software development and security practices to ensure robust and secure applications.",
+            monthlyPrice: "55,000",
+            buttonText: "Enroll Now",
+            popular: false
+            },
         ]
     },
     {
@@ -365,7 +388,7 @@ const courses = [
                 description: "Explore the world of graphic design with courses in Adobe Photoshop, Illustrator, and other design tools.",
                 monthlyPrice: "50,000",
                 buttonText: "Enroll Now",
-                popular: false
+                popular: true
             },
             {
                 title: "Desktop Publishing",

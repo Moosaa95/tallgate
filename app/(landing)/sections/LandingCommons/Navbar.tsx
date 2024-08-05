@@ -54,10 +54,11 @@ const LandingNavbar = () => {
           >
 
             <p className="hidden text-white/90 md:block"><span className="font-bold">Email:</span>support@TallGateacademy.com </p>
-            <div className="inline-flex items-center gap-1 space-x-10">
-              <p><span>Phone:</span>1-800-123-4567</p>
-              <p><span>Address:</span>123 Tech Street, Innovation City, TX</p>
-              <p>Sign up for Free</p>
+            <div className="flex items-center gap-1 space-x-10">
+              <p><span>Phone:</span>+2349052440452, +2347052869461</p>
+              <p><span>Email:</span>Tallgatecomputingenterprise@gmail.com</p>
+              <p className="hidden md:block"><span>Address:</span>No. 2 F.O.Eburuche close, gbazango extension, kubwa Abuja</p>
+              <p className="hidden md:block">Sign up for Free</p>
               {/* arrow right h-4 w-4 inline-flex justify-center items-center */}
             </div>
           </motion.div>
@@ -87,7 +88,7 @@ const LandingNavbar = () => {
               </motion.li>
             </Link>
             <Link
-              href="#about"
+              href="#why"
               onClick={handleScroll}
               className="flex items-center gap-1 font-medium text-black duration-300 cursor-pointer hover:text-black/60"
             >
@@ -96,7 +97,7 @@ const LandingNavbar = () => {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.1, delay: 0.1 }}
               >
-                About
+                Why Choose us
               </motion.li>
             </Link>
             <Link
@@ -113,7 +114,7 @@ const LandingNavbar = () => {
               </motion.li>
             </Link>
           </ul>
-          <a href="#">
+          <a href="/comingsoon">
             <motion.button
               className="px-4 rounded-md text-[13px] btn btn-primary duration-300"
               initial={{ opacity: 0 }}
@@ -167,7 +168,7 @@ const LandingNavbar = () => {
 
                 <Link
                   className="flex items-center gap-1 font-medium text-white duration-300 cursor-pointer hover:text-white/60"
-                  href="#about"
+                  href="#why"
                   onClick={handleScroll}
                 >
                   <motion.li
@@ -176,7 +177,7 @@ const LandingNavbar = () => {
                     transition={{ duration: 0.2, delay: 0.2, ease: "easeIn" }}
                   >
                     
-                    About
+                    Why choose us
                   </motion.li>
                 </Link>
                 <Link
@@ -209,7 +210,7 @@ const LandingNavbar = () => {
                   </motion.li>
                 </Link>
               </ul>
-              <a href="/assets/abdullastestcv.pdf" target="_blank">
+              <a href="/comingsoon" target="_blank">
                 <motion.button
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

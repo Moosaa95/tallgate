@@ -65,52 +65,116 @@
 //     );
 // }
 
+// import Image from 'next/image';
+// import { FaCheckCircle } from 'react-icons/fa';
+// import workStation2 from '@/public/assets/images/workstation2.jpg'
+
+
+// export default function ProductShow() {
+//     return (
+//         <section className="bg-gradient-to-b from-white to-[#D2Dcff] py-12 md:py-24 px-4 overflow-x-clip">
+//             <div className="container mx-auto">
+//                 <div className="section-heading">
+//                     <div className="inline-block px-3 py-1 text-[#768de0] bg-blue-100 rounded-full tag">
+//                         Boost productivity
+//                     </div>
+//                     <h2 className="mt-5 section-title">Why Choose Us?</h2>
+//                     <div className='flex md:flex-row'>
+//                         <ul className="mt-5 max-w-[540px] mx-auto list-none text-center text-lg">
+//                             <li className="flex items-start justify-center mt-4">
+//                                 <FaCheckCircle className="mr-2 text-[#768de0] mb-1 md:mb-0" size={24} />
+//                                 <span>
+//                                     <span className="font-bold">Expert Instructors:</span> Learn from industry professionals with years of experience.
+//                                 </span>
+//                             </li>
+//                             <li className="flex items-start justify-center mt-4">
+//                                 <FaCheckCircle className="mr-2 text-[#768de0] mb-1 md:mb-0" size={24} />
+//                                 <span>
+//                                     <span className="font-bold">Flexible Learning:</span> Choose from online or in-person classes to suit your schedule.
+//                                 </span>
+//                             </li>
+//                             <li className="flex items-start justify-center mt-4">
+//                                 <FaCheckCircle className="mr-2 text-[#768de0] mb-1 md:mb-0" size={24} />
+//                                 <span>
+//                                     <span className="font-bold">Hands-On Training:</span> Engage in practical, hands-on projects to apply your knowledge.
+//                                 </span>
+//                             </li>
+//                             <li className="flex items-start justify-center mt-4">
+//                                 <FaCheckCircle className="mr-2 text-[#768de0] mb-1 md:mb-0" size={24} />
+//                                 <span>
+//                                     <span className="font-bold">Certification:</span> Earn recognized certifications to enhance your career prospects.
+//                                 </span>
+//                             </li>
+//                             <li className="flex items-start justify-center mt-4">
+//                                 <FaCheckCircle className="mr-2 text-[#768de0] mb-1 md:mb-0" size={24} />
+//                                 <span>
+//                                     <span className="font-bold">Supportive Community:</span> Join a network of learners and professionals for continuous growth and support.
+//                                 </span>
+//                             </li>
+//                         </ul>
+//                         <div>
+//                             <Image src={workStation2} width={500} height={500} alt='computer' />
+//                         </div>
+//                     </div>
+//                 </div>
+//                 <div className="relative mt-12">
+//                     {/* Add images or other decorative elements here */}
+//                 </div>
+//             </div>
+//         </section>
+//     );
+// }
+
+import Image from 'next/image';
 import { FaCheckCircle } from 'react-icons/fa';
+import Library from '@/public/assets/images/libraryimg.jpg'
 
 export default function ProductShow() {
     return (
-        <section className="bg-gradient-to-b from-white to-[#D2Dcff] py-12 md:py-24 px-4 overflow-x-clip">
+        <section id='why' className="bg-gradient-to-b from-white to-[#D2Dcff] py-12 md:py-24 px-4 overflow-x-clip">
             <div className="container mx-auto">
-                <div className="section-heading">
+                <div className="section-heading text-center md:text-left">
                     <div className="inline-block px-3 py-1 text-[#768de0] bg-blue-100 rounded-full tag">
                         Boost productivity
                     </div>
                     <h2 className="mt-5 section-title">Why Choose Us?</h2>
-                    <ul className="mt-5 max-w-[540px] mx-auto list-none text-center text-lg">
-                        <li className="flex items-start justify-center mt-4">
-                            <FaCheckCircle className="mr-2 text-[#768de0] mb-1 md:mb-0" size={24} />
+                </div>
+                <div className="flex flex-col md:flex-row items-center mt-5">
+                    <ul className="max-w-[740px] mx-auto md:mx-0 list-none text-lg">
+                        <li className="flex items-start mt-4">
+                            <FaCheckCircle className="mr-2 text-[#768de0]" size={24} />
                             <span>
                                 <span className="font-bold">Expert Instructors:</span> Learn from industry professionals with years of experience.
                             </span>
                         </li>
-                        <li className="flex items-start justify-center mt-4">
-                            <FaCheckCircle className="mr-2 text-[#768de0] mb-1 md:mb-0" size={24} />
+                        <li className="flex items-start mt-4">
+                            <FaCheckCircle className="mr-2 text-[#768de0]" size={24} />
                             <span>
                                 <span className="font-bold">Flexible Learning:</span> Choose from online or in-person classes to suit your schedule.
                             </span>
                         </li>
-                        <li className="flex items-start justify-center mt-4">
-                            <FaCheckCircle className="mr-2 text-[#768de0] mb-1 md:mb-0" size={24} />
+                        <li className="flex items-start mt-4">
+                            <FaCheckCircle className="mr-2 text-[#768de0]" size={24} />
                             <span>
                                 <span className="font-bold">Hands-On Training:</span> Engage in practical, hands-on projects to apply your knowledge.
                             </span>
                         </li>
-                        <li className="flex items-start justify-center mt-4">
-                            <FaCheckCircle className="mr-2 text-[#768de0] mb-1 md:mb-0" size={24} />
+                        <li className="flex items-start mt-4">
+                            <FaCheckCircle className="mr-2 text-[#768de0]" size={24} />
                             <span>
                                 <span className="font-bold">Certification:</span> Earn recognized certifications to enhance your career prospects.
                             </span>
                         </li>
-                        <li className="flex items-start justify-center mt-4">
-                            <FaCheckCircle className="mr-2 text-[#768de0] mb-1 md:mb-0" size={24} />
+                        <li className="flex items-start mt-4">
+                            <FaCheckCircle className="mr-2 text-[#768de0]" size={24} />
                             <span>
                                 <span className="font-bold">Supportive Community:</span> Join a network of learners and professionals for continuous growth and support.
                             </span>
                         </li>
                     </ul>
-                </div>
-                <div className="relative mt-12">
-                    {/* Add images or other decorative elements here */}
+                    <div className="mt-8 md:mt-0 md:ml-8 flex-shrink-0">
+                        <Image src={Library} width={500} height={500} alt='computer' className="rounded-lg shadow-lg" />
+                    </div>
                 </div>
             </div>
         </section>

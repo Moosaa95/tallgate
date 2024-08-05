@@ -116,6 +116,7 @@ const testimonials = [
         name: "John D.",
         username: "@johnd"
     },
+    
 ];
 
 const Testimonials = () => {
@@ -149,7 +150,7 @@ const Testimonials = () => {
                         Discover the impact TallGate Academy has had on our students' careers and lives. Our alumni share their experiences and how our programs have helped them achieve their professional goals.
                     </p>
                 </div>
-                <div className="overflow-hidden relative h-[500px]">
+                <div className="overflow-hidden mt-14 relative h-[500px]">
                     <motion.div
                         className="grid grid-cols-1 gap-6 mt-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
                         animate={controls}

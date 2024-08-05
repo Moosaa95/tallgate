@@ -49,10 +49,10 @@ export default function Hero() {
                                 ease: "easeInOut"
                             }}
                             src={workStation1.src} alt="workstation" className='md:absolute md:h-full md:w-auto md:max-w-none md:left-6 lg:left-0 '  />
-                        <motion.img  style={{
+                        {/* <motion.img  style={{
                             translateY: translateY
-                        }} src={workStation2.src} width={220} height={220} alt="workstation2" className='hidden md:block -top-8 -left-32 md:absolute'  />
-                        <Image src={workStation2} width={220} height={220} alt="workstation2" className='hidden lg:block top-[524px] left-[448px] absolute rotate-[30deg]'  />
+                        }} src={workStation2.src} width={220} height={220} alt="workstation2" className='hidden md:block -top-8 -left-32 md:absolute'  /> */}
+                        {/* <Image src={workStation2} width={220} height={220} alt="workstation2" className='hidden lg:block top-[524px] left-[448px] absolute rotate-[30deg]'  /> */}
                     </div>
                 </div>
             </div>

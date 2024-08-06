@@ -2,6 +2,7 @@ import CallToAction from "../sections/LandingCommons/CallToAction";
 import Footer from "../sections/LandingCommons/Footer";
 import Hero from "../sections/LandingCommons/Hero";
 import LogoTicker from "../sections/LandingCommons/LogoTicker";
+import Packages from "../sections/LandingCommons/Packages";
 import Pricing from "../sections/LandingCommons/Pricing";
 import ProductShow from "../sections/LandingCommons/ProductShowCase";
 import Testimonials from "../sections/LandingCommons/Testimonials";
@@ -13,6 +14,7 @@ const LandingPage = () => {
       {/* <LogoTicker /> */}
       <ProductShow />
       <Pricing />
+      <Packages />
       <Testimonials />
       <CallToAction />
       <Footer />

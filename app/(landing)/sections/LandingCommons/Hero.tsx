@@ -30,7 +30,7 @@ export default function Hero() {
                         Master Your Tech Skills Today! Join our comprehensive computer training courses and unlock your potential. Learn from industry experts and become proficient in the latest technologies. Enroll now and start your journey to success!
                         </p>
                         <div className="flex gap-1 items-center mt-[30px]">
-                            <button className="btn btn-primary">Enroll Today</button>
+                            <button className="btn btn-primary" id='#courses'>Enroll Today</button>
                             <button className="gap-1 btn btn-text">
                                 <span>Learn More</span>
                                 <ArrowRight className="w-5 h-5" />

@@ -53,6 +53,7 @@ Before using the database-backed forms, learning content, or certificate registr
 23. `20261007210000_tighten_course_content_uuid_guards.sql` (requires course-content storage paths to contain real UUID segments before casting, so a crafted object name cannot abort policy evaluation)
 24. `20261007220000_admin_read_draft_lessons.sql` (lets admins read lessons of unpublished courses so curriculum management and seeding work on drafts)
 25. `20261010000000_payment_confirmation_enrollment.sql` (adds `public.update_payment_request_status`, which confirms a payment and grants the linked learner's course enrollment in one transaction, and revokes it on refund)
+26. `20261011000000_admin_audit_log.sql` (adds the `admin_audit_log` table; admin actions record actor, action, target and outcome server-side, readable by admins only)
 
 Certificate PDFs are rendered server-side with `@react-pdf/renderer` and stored in the private `certificates` Storage bucket. `SUPABASE_SERVICE_ROLE_KEY` is required for issuance (upload) and for `GET /api/admin/certificates/[id]/download`, which issues a 5-minute signed URL to signed-in admins only.
 

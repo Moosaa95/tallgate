@@ -2,7 +2,6 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/database/server"
 import { getLessonContent, type LessonAccessResult } from "@/lib/learning/getLessonContent"
-import { coursesData } from "@/lib/data/courses"
 import {
   HiOutlineArrowLeft,
   HiOutlineLockClosed,
@@ -74,16 +73,15 @@ export default async function LessonPlayerPage({
     courseContentError = "Course details could not be loaded. Please try again later."
   }
 
-  // Fallback to static catalogue data if DB course is not yet seeded
-  const staticCourse = coursesData.find((c) => c.slug === slug)
-  const courseTitle = dbCourse?.title || staticCourse?.title
-  const courseOverview = dbCourse?.overview || staticCourse?.overview
-
-  if (!dbCourse && !staticCourse) {
+  // Course content now comes exclusively from the database catalogue.
+  if (!dbCourse) {
     notFound()
   }
 
-  // 2. Fetch modules & lessons hierarchy if dbCourse exists
+  const courseTitle = dbCourse.title
+  const courseOverview = dbCourse.overview
+
+  // 2. Fetch modules & lessons hierarchy
   let modules: ModuleWithLessons[] = []
 
   if (dbCourse?.id) {
@@ -132,23 +130,6 @@ export default async function LessonPlayerPage({
     }
   }
 
-  // Fallback structure if modules are not in DB yet
-  if (modules.length === 0 && !courseContentError && staticCourse?.syllabus) {
-    modules = staticCourse.syllabus.map((mod, modIdx) => ({
-      id: `mod-${modIdx + 1}`,
-      title: mod.moduleTitle,
-      sort_order: modIdx + 1,
-      lessons: mod.topics.map((topic, topIdx) => ({
-        id: `static-lesson-${modIdx + 1}-${topIdx + 1}`,
-        title: topic,
-        content_type: "video" as const,
-        duration_seconds: 300,
-        sort_order: topIdx + 1,
-        is_preview: modIdx === 0 && topIdx === 0,
-      })),
-    }))
-  }
-
   // Flatten all lessons across all modules
   const allLessons = modules.flatMap((m) => m.lessons)
   const requestedLessonId =
@@ -164,19 +145,7 @@ export default async function LessonPlayerPage({
   let accessResult: LessonAccessResult | null = null
 
   if (activeLesson) {
-    // If it's a real DB UUID, call getLessonContent directly
-    if (activeLesson.id && !activeLesson.id.startsWith("static-")) {
-      accessResult = await getLessonContent(activeLesson.id)
-    } else {
-      // For unseeded/static preview demo fallback:
-      accessResult = activeLesson.is_preview
-        ? {
-            access: "granted",
-            contentType: "video",
-            signedUrl: "",
-          }
-        : { access: "denied" }
-    }
+    accessResult = await getLessonContent(activeLesson.id)
   }
 
   const courseOverviewUrl = `/learning-hub/${slug}`

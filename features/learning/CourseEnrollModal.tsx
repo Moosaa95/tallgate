@@ -11,6 +11,7 @@ interface CourseEnrollModalProps {
   isOpen: boolean
   onClose: () => void
   course: {
+    slug: string
     title: string
     priceNgn?: number
     monthlyPriceNgn?: number
@@ -54,7 +55,7 @@ export default function CourseEnrollModal({ isOpen, onClose, course }: CourseEnr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          courseTitle: course.title,
+          courseSlug: course.slug,
         }),
       })
 

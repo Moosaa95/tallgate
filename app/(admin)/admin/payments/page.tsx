@@ -31,6 +31,7 @@ type PaymentWithCourse = {
 export default async function AdminPaymentsPage() {
   let requests: PaymentWithCourse[] = []
   let courses: { id: string; title: string }[] = []
+  let learners: { id: string; full_name: string; email: string }[] = []
   let loadWarning = ""
   let loadFailed = false
 
@@ -40,13 +41,14 @@ export default async function AdminPaymentsPage() {
   } else {
     const supabase = await createClient()
 
-    const [{ data, error }, coursesResult] = await Promise.all([
+    const [{ data, error }, coursesResult, learnersResult] = await Promise.all([
       supabase
         .from("payment_requests")
         .select("*, courses(title)")
         .order("created_at", { ascending: false })
         .limit(ADMIN_QUERY_LIMIT),
       supabase.from("courses").select("id, title").order("title"),
+      supabase.from("profiles").select("id, full_name, email").order("full_name").limit(ADMIN_QUERY_LIMIT),
     ])
 
     if (error) {
@@ -72,6 +74,15 @@ export default async function AdminPaymentsPage() {
     } else {
       courses = coursesResult.data ?? []
     }
+
+    if (learnersResult.error) {
+      console.error("Error fetching profiles for payments:", learnersResult.error)
+      loadWarning = loadWarning
+        ? `${loadWarning} The learner list could not be loaded.`
+        : "The learner list could not be loaded, so new requests cannot be linked to a learner."
+    } else {
+      learners = learnersResult.data ?? []
+    }
   }
 
   return (
@@ -79,7 +90,7 @@ export default async function AdminPaymentsPage() {
       <div>
         <h1 className="text-2xl font-bold text-white tracking-tight">Payment Requests</h1>
         <p className="text-sm text-slate-300 mt-1">
-          Record offline payments, then confirm each one before a student is enrolled manually.
+          Record offline payments against a learner and course, then confirm each one to grant access.
         </p>
       </div>
 
@@ -92,7 +103,7 @@ export default async function AdminPaymentsPage() {
         </div>
       )}
 
-      <PaymentsClient initialRequests={requests} courses={courses} loadFailed={loadFailed} />
+      <PaymentsClient initialRequests={requests} courses={courses} learners={learners} loadFailed={loadFailed} />
     </div>
   )
 }

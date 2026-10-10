@@ -52,6 +52,7 @@ function statusClasses(status: PaymentStatus) {
 }
 
 const emptyForm = {
+  user_id: "",
   full_name: "",
   email: "",
   phone: "",
@@ -65,10 +66,12 @@ const emptyForm = {
 export default function PaymentsClient({
   initialRequests,
   courses,
+  learners,
   loadFailed = false,
 }: {
   initialRequests: PaymentRequest[]
   courses: { id: string; title: string }[]
+  learners: { id: string; full_name: string; email: string }[]
   loadFailed?: boolean
 }) {
   const [requests, setRequests] = useState<PaymentRequest[]>(initialRequests)
@@ -179,6 +182,14 @@ export default function PaymentsClient({
       setCreateError("Amount must be between 0 and 99,999,999.99.")
       return
     }
+    if (!form.user_id) {
+      setCreateError("Select the learner this payment is for.")
+      return
+    }
+    if (!form.course_id) {
+      setCreateError("Select the course this payment is for.")
+      return
+    }
 
     setIsSubmitting(true)
     setCreateError(null)
@@ -187,6 +198,7 @@ export default function PaymentsClient({
         full_name: form.full_name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
+        user_id: form.user_id,
         course_id: form.course_id || null,
         amount,
         method: form.method,
@@ -287,8 +299,8 @@ export default function PaymentsClient({
       </div>
 
       <p className="text-xs text-slate-500">
-        Confirming a payment does not grant course access. Enrol the student from{" "}
-        <span className="font-semibold text-slate-700">Student Enrollments</span> once payment is verified.
+        Confirming a payment grants the linked learner access to the selected course.
+        Refunding a payment revokes that access.
       </p>
 
       {/* Requests table */}
@@ -442,13 +454,34 @@ export default function PaymentsClient({
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Course</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Learner <span className="font-normal text-slate-500">(required)</span>
+                </label>
                 <select
+                  required
+                  value={form.user_id}
+                  onChange={(e) => setForm({ ...form, user_id: e.target.value })}
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                >
+                  <option value="">Select a learner</option>
+                  {learners.map((learner) => (
+                    <option key={learner.id} value={learner.id}>
+                      {learner.full_name} ({learner.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Course <span className="font-normal text-slate-500">(required)</span>
+                </label>
+                <select
+                  required
                   value={form.course_id}
                   onChange={(e) => setForm({ ...form, course_id: e.target.value })}
                   className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary"
                 >
-                  <option value="">No course linked</option>
+                  <option value="">Select a course</option>
                   {courses.map((course) => (
                     <option key={course.id} value={course.id}>
                       {course.title}

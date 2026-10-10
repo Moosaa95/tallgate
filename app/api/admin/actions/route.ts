@@ -18,6 +18,7 @@ import {
 } from "@/lib/admin/catalogueSeed"
 import { toCourse } from "@/lib/data/adminRowMappers"
 import { coursesData } from "@/lib/data/courses"
+import { paymentStatusError } from "@/lib/admin/paymentStatusErrors"
 import type { Database } from "@/types/supabase"
 import { isNonEmptyString, isOneOf, isRecord } from "@/lib/utils"
 
@@ -44,7 +45,6 @@ type CertificateUpdate = Database["public"]["Tables"]["certificates"]["Update"]
 type ContactMessageUpdate = Database["public"]["Tables"]["contact_messages"]["Update"]
 type CertificateInsert = Database["public"]["Tables"]["certificates"]["Insert"]
 type PaymentInsert = Database["public"]["Tables"]["payment_requests"]["Insert"]
-type PaymentUpdate = Database["public"]["Tables"]["payment_requests"]["Update"]
 type CourseInsert = Database["public"]["Tables"]["courses"]["Insert"]
 type CourseRow = Database["public"]["Tables"]["courses"]["Row"]
 
@@ -73,6 +73,8 @@ const MESSAGE_STATUSES: readonly MessageStatus[] = ["unread", "read", "responded
 
 const PAYMENT_STATUSES: readonly PaymentStatus[] = ["pending", "confirmed", "declined", "refunded"]
 const PAYMENT_METHODS: readonly PaymentMethod[] = ["bank_transfer", "card", "cash", "other"]
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 type CertificateRow = Database["public"]["Tables"]["certificates"]["Row"]
 
@@ -1162,8 +1164,8 @@ export async function POST(req: NextRequest) {
 
       case "update_payment_status": {
         const { id, status, note, reference } = payload
-        if (!isNonEmptyString(id)) {
-          return NextResponse.json({ error: "A payment request id is required." }, { status: 400 })
+        if (!isNonEmptyString(id) || !UUID_PATTERN.test(id)) {
+          return NextResponse.json({ error: "A valid payment request id is required." }, { status: 400 })
         }
         if (!isOneOf(PAYMENT_STATUSES, status)) {
           return NextResponse.json({ error: "Invalid payment status." }, { status: 400 })
@@ -1175,74 +1177,30 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "Reference must be 120 characters or fewer." }, { status: 400 })
         }
 
-        const allowedTransitions: Record<PaymentStatus, PaymentStatus[]> = {
-          pending: ["confirmed", "declined"],
-          confirmed: ["refunded"],
-          declined: ["confirmed"],
-          refunded: [],
-        }
-
         const nextStatus = status as PaymentStatus
-        const { data: current, error: currentError } = await supabase
-          .from("payment_requests")
-          .select("status")
-          .eq("id", id)
-          .maybeSingle()
-        if (currentError) {
-          return NextResponse.json(
-            { error: genericDbError("Payment request lookup failed:", currentError) },
-            { status: 400 }
-          )
-        }
-        if (!current) {
-          return NextResponse.json(
-            { error: "Payment status was not changed: the request was not found." },
-            { status: 404 }
-          )
-        }
-        const allowed = allowedTransitions[current.status as PaymentStatus] ?? []
-        if (!allowed.includes(nextStatus)) {
-          return NextResponse.json(
-            { error: `Cannot change status from ${current.status} to ${nextStatus}.` },
-            { status: 400 }
-          )
-        }
-
-        const updateData: PaymentUpdate = {
-          status: nextStatus,
-          updated_at: new Date().toISOString(),
-          reviewed_by: admin.user.id,
-        }
-        if (nextStatus === "confirmed" || nextStatus === "declined" || nextStatus === "refunded") {
-          updateData.reviewed_at = new Date().toISOString()
-        } else {
-          updateData.reviewed_at = null
-        }
-        if (note !== undefined) updateData.note = isNonEmptyString(note) ? note.trim() : null
-        if (reference !== undefined) {
-          updateData.reference = isNonEmptyString(reference) ? reference.trim() : null
-        }
-
-        const { data: updated, error } = await supabase
-          .from("payment_requests")
-          .update(updateData)
-          .eq("id", id)
-          .select("id")
-          .maybeSingle()
+        // The status transition and its matching course_enrollments write run
+        // together in one SECURITY DEFINER transaction (guarded by is_admin),
+        // so course access can never drift from the recorded payment state.
+        const { error } = await supabase.rpc("update_payment_request_status", {
+          p_payment_id: id,
+          p_next_status: nextStatus,
+          p_note: isNonEmptyString(note) ? note.trim() : null,
+          p_reference: isNonEmptyString(reference) ? reference.trim() : null,
+        })
 
         if (error) {
-          return NextResponse.json(
-            { error: genericDbError("Payment status update failed:", error) },
-            { status: 400 }
-          )
+          console.error("Payment status update failed:", error)
+          const mapped = paymentStatusError(error)
+          return NextResponse.json({ error: mapped.message }, { status: mapped.status })
         }
-        if (!updated) {
-          return NextResponse.json(
-            { error: "Payment status was not changed: the request was not found." },
-            { status: 404 }
-          )
-        }
-        return NextResponse.json({ success: true, message: "Payment status updated" })
+
+        const message =
+          nextStatus === "confirmed"
+            ? "Payment confirmed and course access granted."
+            : nextStatus === "refunded"
+              ? "Payment refunded and course access revoked."
+              : "Payment declined."
+        return NextResponse.json({ success: true, message })
       }
 
       case "create_user": {

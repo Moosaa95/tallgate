@@ -1,12 +1,18 @@
 "use client"
 
 import { useState } from "react"
-import { getErrorMessage } from "@/lib/utils"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { fetchCurrentRoleNames } from "@/lib/auth/roles"
 import { getPostLoginPath } from "@/lib/auth/redirect"
+import {
+  GENERIC_SIGNUP_ERROR,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  resolveSignUpOutcome,
+  validatePassword,
+} from "@/lib/auth/registration"
 import { HiOutlineMail, HiOutlineLockClosed, HiOutlineUser, HiOutlineInformationCircle } from "react-icons/hi"
 
 export default function RegisterPage() {
@@ -27,8 +33,15 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
+
+    const passwordError = validatePassword(formData.password)
+    if (passwordError) {
+      setError(passwordError)
+      return
+    }
+
+    setLoading(true)
 
     try {
       const supabase = createClient()
@@ -44,22 +57,21 @@ export default function RegisterPage() {
         },
       })
 
-      if (authError) {
-        throw new Error(authError.message)
-      }
+      // The outcome is identical for a brand-new address and an address that
+      // already exists, so registration cannot be used to enumerate accounts.
+      // The specific reason is only written to the server-side log.
+      const outcome = resolveSignUpOutcome({
+        error: authError,
+        session: data?.session,
+      })
 
-      // Supabase returns a user with an empty identities array when the email
-      // is already registered, without raising an error (avoids enumeration).
-      if (data.user && data.user.identities && data.user.identities.length === 0) {
-        setError(
-          "An account with this email already exists. Try signing in instead."
-        )
+      if (outcome.kind === "error") {
+        console.error("Registration failed:", authError?.status, authError?.code)
+        setError(outcome.message)
         return
       }
 
-      // Email confirmation is enabled on this project: signUp succeeds but
-      // returns no session until the user confirms via the emailed link.
-      if (!data.session) {
+      if (outcome.kind === "verify-email") {
         router.push("/verify-email")
         return
       }
@@ -69,7 +81,7 @@ export default function RegisterPage() {
       router.refresh()
     } catch (err: unknown) {
       console.error("Registration error:", err)
-      setError(getErrorMessage(err, "Failed to create account."))
+      setError(GENERIC_SIGNUP_ERROR)
     } finally {
       setLoading(false)
     }
@@ -159,11 +171,13 @@ export default function RegisterPage() {
               id="password"
               name="password"
               type="password"
+              autoComplete="new-password"
               required
-              minLength={6}
+              minLength={PASSWORD_MIN_LENGTH}
+              maxLength={PASSWORD_MAX_LENGTH}
               value={formData.password}
               onChange={handleChange}
-              placeholder="Min. 6 characters"
+              placeholder={`Min. ${PASSWORD_MIN_LENGTH} characters`}
               className="form-input text-sm pl-9"
             />
             <HiOutlineLockClosed className="w-4 h-4 text-slate-400 absolute left-3 top-3" />

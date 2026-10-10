@@ -1,9 +1,19 @@
 export function safeNextPath(next?: string | null) {
-  if (!next?.startsWith("/") || next.startsWith("//")) return null
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return null
 
   const baseUrl = "https://tallgate.invalid"
-  const destination = new URL(next, baseUrl)
+  let destination: URL
+  try {
+    destination = new URL(next, baseUrl)
+  } catch {
+    return null
+  }
   if (destination.origin !== baseUrl) return null
+
+  // Normalising dot-segments (e.g. "/admin/../..//evil.com") or backslashes can
+  // turn a value that started with one slash into a protocol-relative path, so
+  // re-check the resolved path before trusting it.
+  if (destination.pathname.startsWith("//")) return null
 
   const path = `${destination.pathname}${destination.search}${destination.hash}`
   if (path.startsWith("/login") || path.startsWith("/register")) return null

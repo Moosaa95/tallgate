@@ -19,7 +19,7 @@ import {
 import { toCourse } from "@/lib/data/adminRowMappers"
 import { coursesData } from "@/lib/data/courses"
 import type { Database } from "@/types/supabase"
-import { getErrorMessage, isNonEmptyString, isOneOf, isRecord } from "@/lib/utils"
+import { isNonEmptyString, isOneOf, isRecord } from "@/lib/utils"
 
 export const runtime = "nodejs"
 
@@ -222,22 +222,30 @@ export async function POST(req: NextRequest) {
         if (!isOneOf(CONSULTATION_STATUSES, status)) {
           return NextResponse.json({ error: "Invalid consultation status." }, { status: 400 })
         }
-        if (admin_notes !== undefined && admin_notes !== null && typeof admin_notes !== "string") {
-          return NextResponse.json({ error: "Admin notes must be a string." }, { status: 400 })
+        if (admin_notes !== undefined && admin_notes !== null && !isOptionalText(admin_notes, 2000)) {
+          return NextResponse.json({ error: "Admin notes must be 2000 characters or fewer." }, { status: 400 })
         }
 
         const updateData: ConsultationUpdate = { status, updated_at: new Date().toISOString() }
         if (admin_notes !== undefined) updateData.admin_notes = admin_notes
 
-        const { error } = await supabase
+        const { data: updated, error } = await supabase
           .from("consultation_requests")
           .update(updateData)
           .eq("id", id)
+          .select("id")
+          .maybeSingle()
 
         if (error) {
           return NextResponse.json(
             { error: genericDbError("Consultation status update failed:", error) },
             { status: 400 }
+          )
+        }
+        if (!updated) {
+          return NextResponse.json(
+            { error: "Consultation status was not changed: the request was not found." },
+            { status: 404 }
           )
         }
         return NextResponse.json({ success: true, message: "Consultation status updated" })
@@ -254,15 +262,23 @@ export async function POST(req: NextRequest) {
 
         const updateData: StartupApplicationUpdate = { status, updated_at: new Date().toISOString() }
 
-        const { error } = await supabase
+        const { data: updated, error } = await supabase
           .from("startup_applications")
           .update(updateData)
           .eq("id", id)
+          .select("id")
+          .maybeSingle()
 
         if (error) {
           return NextResponse.json(
             { error: genericDbError("Startup application status update failed:", error) },
             { status: 400 }
+          )
+        }
+        if (!updated) {
+          return NextResponse.json(
+            { error: "Startup application status was not changed: the application was not found." },
+            { status: 404 }
           )
         }
         return NextResponse.json({ success: true, message: "Startup application status updated" })
@@ -987,12 +1003,23 @@ export async function POST(req: NextRequest) {
 
         const updateData: CertificateUpdate = { is_valid }
 
-        const { error } = await supabase.from("certificates").update(updateData).eq("id", id)
+        const { data: updated, error } = await supabase
+          .from("certificates")
+          .update(updateData)
+          .eq("id", id)
+          .select("id")
+          .maybeSingle()
 
         if (error) {
           return NextResponse.json(
             { error: genericDbError("Certificate validity toggle failed:", error) },
             { status: 400 }
+          )
+        }
+        if (!updated) {
+          return NextResponse.json(
+            { error: "Certificate validity was not changed: the certificate was not found." },
+            { status: 404 }
           )
         }
         return NextResponse.json({ success: true, message: "Certificate validity toggled" })
@@ -1009,12 +1036,23 @@ export async function POST(req: NextRequest) {
 
         const updateData: ContactMessageUpdate = { status }
 
-        const { error } = await supabase.from("contact_messages").update(updateData).eq("id", id)
+        const { data: updated, error } = await supabase
+          .from("contact_messages")
+          .update(updateData)
+          .eq("id", id)
+          .select("id")
+          .maybeSingle()
 
         if (error) {
           return NextResponse.json(
             { error: genericDbError("Message status update failed:", error) },
             { status: 400 }
+          )
+        }
+        if (!updated) {
+          return NextResponse.json(
+            { error: "Message status was not changed: the message was not found." },
+            { status: 404 }
           )
         }
         return NextResponse.json({ success: true, message: "Message status updated" })
@@ -1218,7 +1256,11 @@ export async function POST(req: NextRequest) {
         try {
           adminSupabase = createAdminClient()
         } catch (error: unknown) {
-          return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 })
+          console.error("Admin client unavailable for user creation:", error)
+          return NextResponse.json(
+            { error: "User management is temporarily unavailable." },
+            { status: 503 }
+          )
         }
 
         const { data: roleData, error: roleError } = await adminSupabase
@@ -1319,7 +1361,11 @@ export async function POST(req: NextRequest) {
         try {
           adminSupabase = createAdminClient()
         } catch (error: unknown) {
-          return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 })
+          console.error("Admin client unavailable for role update:", error)
+          return NextResponse.json(
+            { error: "User management is temporarily unavailable." },
+            { status: 503 }
+          )
         }
 
         const { data: roleData, error: roleError } = await adminSupabase

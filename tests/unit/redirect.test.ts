@@ -17,6 +17,12 @@ describe("safeNextPath", () => {
     expect(safeNextPath("http://evil.com/path")).toBeNull()
   })
 
+  it("rejects paths that normalise to protocol-relative URLs", () => {
+    expect(safeNextPath("/admin/../..//evil.com")).toBeNull()
+    expect(safeNextPath("/dashboard/..//evil.com")).toBeNull()
+    expect(safeNextPath("/\\evil.com")).toBeNull()
+  })
+
   it("rejects non-path schemes", () => {
     expect(safeNextPath("javascript:alert(1)")).toBeNull()
   })

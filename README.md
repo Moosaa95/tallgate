@@ -50,6 +50,8 @@ Before using the database-backed forms, learning content, or certificate registr
 20. `20261007180000_seed_learning_hub_catalogue.sql` (seeds the six Learning Hub packages, one module each, and their syllabus lessons so the admin content tools have targets)
 21. `20261007190000_admin_catalogue_writes.sql` (grants admins INSERT on `courses` and `course_modules` so the "Add Course" and "Seed/Sync Learning Hub Courses" actions can persist)
 22. `20261007200000_signup_role_mapping.sql` (makes `handle_new_user()` honour the `account_type` chosen at sign-up, allow-listed to `startup_founder`/`business_owner`/`learner` only)
+23. `20261007210000_tighten_course_content_uuid_guards.sql` (requires course-content storage paths to contain real UUID segments before casting, so a crafted object name cannot abort policy evaluation)
+24. `20261007220000_admin_read_draft_lessons.sql` (lets admins read lessons of unpublished courses so curriculum management and seeding work on drafts)
 
 Certificate PDFs are rendered server-side with `@react-pdf/renderer` and stored in the private `certificates` Storage bucket. `SUPABASE_SERVICE_ROLE_KEY` is required for issuance (upload) and for `GET /api/admin/certificates/[id]/download`, which issues a 5-minute signed URL to signed-in admins only.
 

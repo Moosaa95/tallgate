@@ -908,6 +908,15 @@ export interface Database {
           is_valid: boolean
         }[]
       }
+      update_payment_request_status: {
+        Args: {
+          p_payment_id: string
+          p_next_status: string
+          p_note?: string | null
+          p_reference?: string | null
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation"
 import { siteConfig } from "@/lib/config/site"
 import Link from "next/link"
-import { coursesData } from "@/lib/data/courses"
+import { getPublishedCourseBySlug } from "@/lib/catalogue/getPublicCatalogue"
 import { formatNaira } from "@/lib/utils"
 import CourseEnrollAction from "@/features/learning/CourseEnrollAction"
+import CatalogueNotice from "@/features/learning/CatalogueNotice"
 import {
   HiOutlineArrowLeft,
   HiOutlineClock,
@@ -13,11 +14,7 @@ import {
   HiOutlineLocationMarker,
 } from "react-icons/hi"
 
-export function generateStaticParams() {
-  return coursesData.map((course) => ({
-    slug: course.slug,
-  }))
-}
+export const dynamic = "force-dynamic"
 
 export async function generateMetadata({
   params,
@@ -25,12 +22,12 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const course = coursesData.find((c) => c.slug === slug)
-  if (!course) return { title: "Course Not Found" }
+  const result = await getPublishedCourseBySlug(slug)
+  if (result.status !== "ok") return { title: "Course Not Found" }
 
   return {
-    title: `${course.title} | TallGate Learning Hub`,
-    description: course.overview,
+    title: `${result.course.title} | TallGate Learning Hub`,
+    description: result.course.overview,
   }
 }
 
@@ -40,11 +37,31 @@ export default async function CourseDetailPage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const course = coursesData.find((c) => c.slug === slug)
+  const result = await getPublishedCourseBySlug(slug)
 
-  if (!course) {
+  if (result.status === "not_found") {
     notFound()
   }
+
+  if (result.status === "unavailable") {
+    return (
+      <div className="py-12 sm:py-20">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Link
+            href="/learning-hub"
+            prefetch={true}
+            className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white mb-8 transition-colors"
+          >
+            <HiOutlineArrowLeft className="w-4 h-4" />
+            <span>Back to All Courses</span>
+          </Link>
+          <CatalogueNotice message={result.message} />
+        </div>
+      </div>
+    )
+  }
+
+  const course = result.course
 
   return (
     <div className="py-12 sm:py-20 space-y-16">

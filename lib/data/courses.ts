@@ -1,8 +1,8 @@
 export interface CourseOffering {
   slug: string
   title: string
-  category: 'Foundation' | 'Professional' | 'Digital Skills' | 'Security' | 'Development' | 'Health Technology'
-  level: 'Beginner' | 'Intermediate' | 'Advanced' | 'All Levels'
+  category: string
+  level: string
   priceNgn: number
   duration: string
   format: 'Online Training'
@@ -19,6 +19,14 @@ export interface CourseOffering {
 
 const onlineFormat = 'Online Training' as const
 
+/**
+ * Authored seed catalogue.
+ *
+ * Supabase is the source of truth for the public Learning Hub; this array only
+ * feeds the admin "Seed/Sync Learning Hub Courses" workflow. Public pages read
+ * published courses from the database, so edits made in the admin catalogue are
+ * what learners actually see.
+ */
 export const coursesData: CourseOffering[] = [
   {
     slug: 'appreciation-package',

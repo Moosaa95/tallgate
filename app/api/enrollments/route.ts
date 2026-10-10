@@ -14,6 +14,7 @@ import {
   rateLimitUnavailableResponse,
   RateLimitUnavailableError,
 } from "@/lib/api/rateLimit"
+import { resolveEnrollmentCourse } from "@/lib/catalogue/enrollmentCourse"
 
 /**
  * POST /api/enrollments
@@ -32,14 +33,28 @@ export async function POST(req: NextRequest) {
   try {
     const parsed = await readJsonObject(req)
     if (parsed.response) return parsed.response
-    const { fullName, email, phone, courseTitle, schedulePreference, learningMode } =
-      parsed.data
+    const {
+      fullName,
+      email,
+      phone,
+      courseSlug,
+      courseTitle,
+      schedulePreference,
+      learningMode,
+    } = parsed.data
+
+    const courseSlugValue = isNonEmptyText(courseSlug, 120)
+      ? courseSlug.trim()
+      : null
+    const courseTitleValue = isNonEmptyText(courseTitle, 200)
+      ? courseTitle.trim()
+      : null
 
     if (
       !isNonEmptyText(fullName, 120) ||
       !isValidEmailAddress(email) ||
       !isNonEmptyText(phone, 40) ||
-      !isNonEmptyText(courseTitle, 200) ||
+      (!courseSlugValue && !courseTitleValue) ||
       !isOptionalText(schedulePreference, 120) ||
       !isOptionalText(learningMode, 120)
     ) {
@@ -61,15 +76,53 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = createAdminClient()
+
+    // Course enrollment always carries a slug and is validated against the
+    // published catalogue, so the server owns the authoritative title and price
+    // and a tampered client cannot enroll in an unpublished course. Non-course
+    // programme tracks (e.g. Startup Hub) legitimately submit a plain title.
+    let courseLabel: string
+    let coursePrice: number | null = null
+
+    if (courseSlugValue) {
+      const { data: courseRow, error: courseError } = await supabase
+        .from("courses")
+        .select("title, price_ngn, is_published")
+        .eq("slug", courseSlugValue)
+        .maybeSingle()
+
+      if (courseError) {
+        console.error("Enrollment course lookup failed:", courseError)
+        return NextResponse.json(
+          { error: "Enrollment requests are temporarily unavailable." },
+          { status: 503 }
+        )
+      }
+
+      const course = resolveEnrollmentCourse(courseRow)
+      if (!course) {
+        return NextResponse.json(
+          { error: "This course is not available for enrollment." },
+          { status: 400 }
+        )
+      }
+
+      courseLabel = course.title
+      coursePrice = course.priceNgn
+    } else {
+      courseLabel = courseTitleValue ?? ""
+    }
+
+    const priceSuffix =
+      coursePrice === null ? "" : ` (₦${coursePrice.toLocaleString("en-NG")})`
+
     const { error: dbError } = await supabase.from("service_inquiries").insert([
       {
         full_name: fullName.trim(),
         email: email.trim().toLowerCase(),
         phone: phone.trim(),
-        company_name: `Enrollment: ${courseTitle.trim()} (${
-          isNonEmptyString(learningMode) ? learningMode : "Hybrid"
-        }, ${isNonEmptyString(schedulePreference) ? schedulePreference : "Standard"})`,
-        message: `Applicant requested enrollment for course ${courseTitle.trim()}. Schedule: ${
+        company_name: `Enrollment: ${courseLabel}${priceSuffix}`,
+        message: `Applicant requested enrollment for course ${courseLabel}${priceSuffix}. Schedule: ${
           isNonEmptyString(schedulePreference) ? schedulePreference : "Standard"
         }. Mode: ${isNonEmptyString(learningMode) ? learningMode : "Hybrid"}.`,
         status: "new",

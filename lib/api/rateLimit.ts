@@ -45,6 +45,10 @@ function getClientIp(request: NextRequest): string | null {
   }
   // Outside production, fall back to a fixed key so local flows keep working.
   if (process.env.NODE_ENV !== "production") return "127.0.0.1"
+  // In production, never fall back to a shared key. If the trusted proxy header
+  // is missing, every caller would collapse into one bucket, letting a single
+  // client exhaust the limit for everyone. Reject the request instead (see
+  // checkRateLimit), which surfaces as a 503 rather than a global lockout.
   return null
 }
 
@@ -58,7 +62,14 @@ export async function checkRateLimit(
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!serviceRoleKey) throw new RateLimitUnavailableError()
 
-  const key = identity ?? getClientIp(request) ?? "unknown"
+  const key = identity ?? getClientIp(request)
+  if (!key) {
+    console.error(
+      "Rate-limit identity unavailable: no trusted client IP header was present."
+    )
+    throw new RateLimitUnavailableError()
+  }
+
   const keyHash = createHmac("sha256", serviceRoleKey)
     .update(`${bucket}:${key}`)
     .digest("hex")

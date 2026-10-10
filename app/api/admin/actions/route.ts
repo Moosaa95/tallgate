@@ -385,6 +385,20 @@ export async function POST(req: NextRequest) {
             { status: 409 }
           )
         }
+
+        // Keep the admin-managed domain list in sync so a newly typed domain is
+        // persisted for reuse. Existing domains are left untouched, and a sync
+        // failure never fails the course move that already succeeded.
+        const { error: categoryError } = await supabase
+          .from("course_categories")
+          .upsert(
+            { name: category.trim(), display_order: 0 },
+            { onConflict: "name", ignoreDuplicates: true }
+          )
+        if (categoryError) {
+          console.error("Course domain category sync failed:", categoryError)
+        }
+
         return NextResponse.json({ success: true, message: "Course domain updated" })
       }
 

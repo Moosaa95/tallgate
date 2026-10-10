@@ -17,6 +17,7 @@ export type Json =
  *   supabase/migrations/20261007110000_course_documents_and_live_sessions.sql
  *   supabase/migrations/20261007120000_admin_course_lesson_writes.sql
  *   supabase/migrations/20261007130000_payment_requests.sql
+ *   supabase/migrations/20261011000000_admin_audit_log.sql
  *
  * Tables that exist only in earlier revisions (enrollments, categories) and
  * columns dropped by later migrations (lessons.content_markdown) have been
@@ -26,6 +27,41 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          id: string
+          actor_id: string | null
+          action: string
+          target: string | null
+          outcome: "success" | "failure"
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          actor_id?: string | null
+          action: string
+          target?: string | null
+          outcome?: "success" | "failure"
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          actor_id?: string | null
+          action?: string
+          target?: string | null
+          outcome?: "success" | "failure"
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           id: string

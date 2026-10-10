@@ -19,6 +19,11 @@ import {
 import { toCourse } from "@/lib/data/adminRowMappers"
 import { coursesData } from "@/lib/data/courses"
 import { paymentStatusError } from "@/lib/admin/paymentStatusErrors"
+import {
+  auditOutcomeFromStatus,
+  extractAuditTarget,
+  recordAdminAudit,
+} from "@/lib/admin/auditLog"
 import type { Database } from "@/types/supabase"
 import { isNonEmptyString, isOneOf, isRecord } from "@/lib/utils"
 
@@ -32,6 +37,12 @@ export const runtime = "nodejs"
 function genericDbError(context: string, error: unknown): string {
   console.error(context, error)
   return "The operation could not be completed. Please try again."
+}
+
+type AdminAuditContext = {
+  actorId: string | null
+  action: string | null
+  target: string | null
 }
 
 const CERTIFICATE_BUCKET = "certificates"
@@ -198,9 +209,33 @@ function buildSeedMessage(summary: CatalogueSeedSummary): string {
 }
 
 export async function POST(req: NextRequest) {
+  const audit: AdminAuditContext = { actorId: null, action: null, target: null }
+
+  const response = await handleAdminAction(req, audit)
+
+  // Security-relevant admin actions are recorded with actor, action, target and
+  // outcome. Requests that never authenticated (no actor) are not attributed
+  // here and are handled by the proxy/rate limiter instead.
+  if (audit.actorId && audit.action) {
+    await recordAdminAudit({
+      actorId: audit.actorId,
+      action: audit.action,
+      target: audit.target,
+      outcome: auditOutcomeFromStatus(response.status),
+    })
+  }
+
+  return response
+}
+
+async function handleAdminAction(
+  req: NextRequest,
+  audit: AdminAuditContext
+): Promise<NextResponse> {
   try {
     const admin = await requireAdminApi()
     if (admin.error) return admin.error
+    audit.actorId = admin.user.id
 
     const parsed = await readJsonObject(req)
     if (parsed.response) return parsed.response
@@ -212,6 +247,9 @@ export async function POST(req: NextRequest) {
     if (!isRecord(payload)) {
       return NextResponse.json({ error: "A valid action payload is required." }, { status: 400 })
     }
+
+    audit.action = action.trim()
+    audit.target = extractAuditTarget(payload)
 
     const supabase = await createClient()
 

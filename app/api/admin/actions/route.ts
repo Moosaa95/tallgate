@@ -589,11 +589,11 @@ export async function POST(req: NextRequest) {
         }
 
         const moduleIds = moduleRows.map((module) => module.id)
-        let lessonRows: { module_id: string; title: string }[] = []
+        let lessonRows: { module_id: string; title: string; order_index: number }[] = []
         if (moduleIds.length > 0) {
           const { data, error } = await supabase
             .from("lessons")
-            .select("module_id, title")
+            .select("module_id, title, order_index")
             .in("module_id", moduleIds)
           if (error) {
             return NextResponse.json(
@@ -686,12 +686,20 @@ export async function POST(req: NextRequest) {
 
             if (modulePlan.lessonTitlesToCreate.length === 0) continue
 
+            // New lessons must be ordered after any lessons already in the
+            // module, otherwise a re-seed collides at order_index 0 and the
+            // curriculum renders in an ambiguous order.
+            const firstOrderIndex =
+              lessonRows
+                .filter((lesson) => lesson.module_id === moduleId)
+                .reduce((max, lesson) => Math.max(max, lesson.order_index), -1) + 1
+
             const lessonInserts = modulePlan.lessonTitlesToCreate.map(
               (lessonTitle, lessonIndex) => ({
                 module_id: moduleId,
                 title: lessonTitle,
                 content_type: "text" as const,
-                order_index: lessonIndex,
+                order_index: firstOrderIndex + lessonIndex,
                 is_preview: false,
               })
             )

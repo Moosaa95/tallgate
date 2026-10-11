@@ -45,10 +45,12 @@ change and is intentionally out of scope here.
   project, not by application code. The app inherits GoTrue defaults: access
   tokens are short-lived and refreshed by refresh tokens, which have a longer
   absolute lifetime.
-- **Current configured values: NOT VERIFIED.** Reading them requires the
-  Supabase dashboard (Authentication → Sessions) or Management API; no access
-  token was available in this environment. Confirm and record the project's
-  "Refresh token lifetime" and "Time-box user sessions" settings before release.
+- **Current configured values (read-only Management API, 2026-10-11):**
+  - `jwt_exp = 3600` — access tokens live 1 hour.
+  - `refresh_token_rotation_enabled = true`, `security_refresh_token_reuse_interval = 10` — refresh tokens rotate on use with a 10s reuse window.
+  - `sessions_inactivity_timeout = 0` and `sessions_timebox = 0` — **no** idle or absolute expiry configured.
+  - `sessions_single_per_user = false` — multiple concurrent sessions are allowed.
+  These apply to the linked project `zlmbitphlzokjmfwldcb`; confirm it is the intended production project and re-read after any change.
 - **Re-authentication:** protected routes redirect unauthenticated or expired
   sessions to `/login` via `lib/supabase/middleware.ts`. Password recovery and
   email confirmation flows are handled by Supabase Auth.
@@ -57,8 +59,7 @@ change and is intentionally out of scope here.
 
 ## Verification checklist (deployment)
 
-1. In the Supabase dashboard, Authentication → Sessions, record the refresh
-   token lifetime and whether time-boxing is enabled; update this document.
+1. ~~Record the hosted refresh-token lifetime and time-boxing~~ — **done 2026-10-11** (values above). Decide whether to enable an inactivity timeout / time-box (currently both `0`).
 2. Confirm cookies in a production browser are `Secure`, `SameSite=Lax`, and
    scoped to `path=/`.
 3. Confirm logout clears the `sb-*` auth cookies and a protected route then

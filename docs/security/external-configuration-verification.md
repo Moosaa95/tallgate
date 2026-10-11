@@ -141,6 +141,11 @@ See `docs/security/migration-deployment-plan.md` for the X-06/X-11 root-cause an
 
 - **Status:** PARTIAL. Verified on the local lockfile; the deployed set is assumed identical.
 - **Evidence (2026-10-11):** `npm audit --omit=dev` → **0 vulnerabilities**; `npm audit` → **9 advisories (2 moderate, 7 high)**, all in dev/build tooling (Tailwind/PostCSS/eslint chain).
+- **Classification (Batch 8C):** all 9 are aggregator effects of two underlying advisories, both **dev/build-only** and not present in the runtime tree (`--omit=dev` is clean):
+  - `braces <=3.0.3` — stack-exhaustion DoS via deeply nested patterns (HIGH; reached via `micromatch`/`chokidar` in the `eslint-config-next` and `tailwindcss` chains). Runs only on trusted, in-repo globs during lint/build/watch.
+  - `postcss-selector-parser <7.1.6` (PostCSS) — quadratic-complexity CPU exhaustion parsing flat selectors (MODERATE), via `tailwindcss` → `postcss-nested`. CSS is authored in-repo, not attacker-supplied at runtime.
+  - **Runtime risk: LOW.** No attacker-controlled input reaches these packages in production.
+  - **Fix:** `npm audit fix` resolves to semver-**major** bumps (`eslint-config-next`, `tailwindcss`); deferred as unrelated churn to be handled in a dedicated dependency-maintenance change, not silently forced here.
 - **Steps:** Run `npm audit --omit=dev` against the exact lockfile deployed (or a `npm ci` in the deploy image) and confirm the runtime tree is clean.
 
 ## X-11 — Deployed schema parity with `main`

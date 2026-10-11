@@ -4,6 +4,7 @@ import { mockConsultations, type MockConsultation } from "@/lib/data/adminMockDa
 import { toConsultation } from "@/lib/data/adminRowMappers"
 import { ADMIN_QUERY_LIMIT } from "@/lib/admin/queryLimits"
 import InquiriesClient from "@/components/admin/InquiriesClient"
+import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
   title: "Consultation Queue & Scoping Leads | TallGate Admin",
@@ -33,7 +34,7 @@ export default async function AdminInquiriesPage() {
         .limit(ADMIN_QUERY_LIMIT)
 
       if (error) {
-        console.error("Admin consultation query failed:", error)
+        logError("admin.consultations_query_failed", error)
         dataWarning = "Consultation requests could not be loaded. This queue may be incomplete."
       } else {
         consultations = (data ?? []).map(toConsultation)
@@ -42,7 +43,7 @@ export default async function AdminInquiriesPage() {
         }
       }
     } catch (err) {
-      console.error("Admin consultation query failed:", err)
+      logError("admin.consultations_query_failed", err)
       dataWarning = "Consultation requests could not be loaded. This queue may be incomplete."
     }
   }

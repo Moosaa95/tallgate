@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin"
+import { logError, logWarn } from "@/lib/logging/logger"
 
 export type AdminAuditOutcome = "success" | "failure"
 
@@ -53,9 +54,9 @@ export async function recordAdminAudit(entry: AdminAuditEntry): Promise<void> {
     })
 
     if (error) {
-      console.error("[admin-audit] insert failed", { code: error.code })
+      logError("admin_audit.insert_failed", error, { code: error.code })
     }
   } catch {
-    console.error("[admin-audit] admin client unavailable")
+    logWarn("admin_audit.client_unavailable")
   }
 }

@@ -4,6 +4,7 @@ import { mockMessages, type MockMessage } from "@/lib/data/adminMockData"
 import { toMessage } from "@/lib/data/adminRowMappers"
 import { ADMIN_QUERY_LIMIT } from "@/lib/admin/queryLimits"
 import MessagesClient from "@/components/admin/MessagesClient"
+import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
   title: "General Contact Inbox | TallGate Admin",
@@ -33,7 +34,7 @@ export default async function AdminMessagesPage() {
         .limit(ADMIN_QUERY_LIMIT)
 
       if (error) {
-        console.error("Admin contact messages query failed:", error)
+        logError("admin.messages_query_failed", error)
         dataWarning = "Messages could not be loaded. This inbox may be incomplete."
       } else {
         messages = (data ?? []).map(toMessage)
@@ -42,7 +43,7 @@ export default async function AdminMessagesPage() {
         }
       }
     } catch (err) {
-      console.error("Admin contact messages query failed:", err)
+      logError("admin.messages_query_failed", err)
       dataWarning = "Messages could not be loaded. This inbox may be incomplete."
     }
   }

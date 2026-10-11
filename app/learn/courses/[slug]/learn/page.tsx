@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/database/server"
 import { getLessonContent, type LessonAccessResult } from "@/lib/learning/getLessonContent"
+import { logError } from "@/lib/logging/logger"
 import {
   HiOutlineArrowLeft,
   HiOutlineLockClosed,
@@ -69,7 +70,7 @@ export default async function LessonPlayerPage({
     .maybeSingle()
 
   if (courseError) {
-    console.error("Unable to load course:", courseError)
+    logError("lesson_player.course_load_failed", courseError, { slug })
     courseContentError = "Course details could not be loaded. Please try again later."
   }
 
@@ -92,7 +93,7 @@ export default async function LessonPlayerPage({
       .order("order_index", { ascending: true })
 
     if (modulesError) {
-      console.error("Unable to load course modules:", modulesError)
+      logError("lesson_player.modules_load_failed", modulesError, { slug })
       courseContentError = "Course lessons could not be loaded. Please try again later."
     } else if (dbModules?.length) {
       const { data: dbLessons, error: lessonsError } = await supabase
@@ -102,7 +103,7 @@ export default async function LessonPlayerPage({
         .order("order_index", { ascending: true })
 
       if (lessonsError) {
-        console.error("Unable to load course lessons:", lessonsError)
+        logError("lesson_player.lessons_load_failed", lessonsError, { slug })
         courseContentError = "Course lessons could not be loaded. Please try again later."
       } else {
         const lessonsByModule = new Map<string, ModuleWithLessons["lessons"]>()

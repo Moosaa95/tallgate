@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/database/server";
+import { logError } from "@/lib/logging/logger";
 
 export type LessonAccessResult =
   | { access: "denied" }
@@ -23,7 +24,7 @@ export async function getLessonContent(
     .maybeSingle();
 
   if (lessonError) {
-    console.error("Unable to load lesson metadata:", lessonError)
+    logError("lesson.metadata_load_failed", lessonError, { lessonId })
     throw new Error("Unable to load lesson access.")
   }
 
@@ -38,7 +39,7 @@ export async function getLessonContent(
     .maybeSingle();
 
   if (contentError) {
-    console.error("Unable to load lesson content:", contentError)
+    logError("lesson.content_load_failed", contentError, { lessonId })
     throw new Error("Unable to load lesson content.")
   }
 
@@ -68,7 +69,7 @@ export async function getLessonContent(
     )
 
   if (error || !signed) {
-    console.error("Unable to sign lesson content URL:", error)
+    logError("lesson.content_sign_failed", error, { lessonId })
     throw new Error("Unable to load lesson content.")
   }
 

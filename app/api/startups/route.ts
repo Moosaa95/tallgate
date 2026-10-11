@@ -15,6 +15,7 @@ import {
   rateLimitUnavailableResponse,
   RateLimitUnavailableError,
 } from "@/lib/api/rateLimit"
+import { logError } from "@/lib/logging/logger"
 
 const STARTUP_STAGES = [
   "idea",
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
     ])
 
     if (dbError) {
-      console.error("Startup application database insert failed:", dbError)
+      logError("startup.insert_failed", dbError)
       return NextResponse.json(
         { error: "Application could not be saved. Please try again." },
         { status: 503 }
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof RateLimitUnavailableError) {
       return rateLimitUnavailableResponse()
     }
-    console.error("Startup API error:", error)
+    logError("startup.request_failed", error)
     return NextResponse.json(
       { error: "Internal server error." },
       { status: 500 }

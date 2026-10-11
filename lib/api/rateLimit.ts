@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto"
 import { isIP } from "node:net"
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { logError, logWarn } from "@/lib/logging/logger"
 
 export type RateLimitBucket =
   | "contact"
@@ -64,9 +65,7 @@ export async function checkRateLimit(
 
   const key = identity ?? getClientIp(request)
   if (!key) {
-    console.error(
-      "Rate-limit identity unavailable: no trusted client IP header was present."
-    )
+    logWarn("rate_limit.identity_unavailable", { bucket })
     throw new RateLimitUnavailableError()
   }
 
@@ -86,14 +85,14 @@ export async function checkRateLimit(
     )
 
     if (error || typeof data !== "boolean") {
-      console.error("Rate-limit check failed:", error)
+      logError("rate_limit.check_failed", error, { bucket })
       throw new RateLimitUnavailableError()
     }
 
     return data
   } catch (error) {
     if (error instanceof RateLimitUnavailableError) throw error
-    console.error("Rate-limit check failed:", error)
+    logError("rate_limit.check_failed", error, { bucket })
     throw new RateLimitUnavailableError()
   }
 }

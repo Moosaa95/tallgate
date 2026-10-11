@@ -14,6 +14,7 @@ import {
   rateLimitUnavailableResponse,
   RateLimitUnavailableError,
 } from "@/lib/api/rateLimit"
+import { logError } from "@/lib/logging/logger"
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     ])
 
     if (dbError) {
-      console.error("Consultation database insert failed:", dbError)
+      logError("consultation.insert_failed", dbError)
       return NextResponse.json(
         { error: "Consultation request could not be saved. Please try again." },
         { status: 503 }
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof RateLimitUnavailableError) {
       return rateLimitUnavailableResponse()
     }
-    console.error("Consultation API error:", error)
+    logError("consultation.request_failed", error)
     return NextResponse.json(
       { error: "Internal server error occurred." },
       { status: 500 }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { uniqueRoles } from "@/lib/auth/roles"
+import { logError } from "@/lib/logging/logger"
 
 export type CurrentUser = {
   id: string
@@ -43,7 +44,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     .maybeSingle()
 
   if (profileError) {
-    console.error("Unable to load profile for current user:", profileError)
+    logError("auth.profile_load_failed", profileError, { userId: user.id })
   }
 
   const { data: roleRows, error: rolesError } = await supabase
@@ -52,7 +53,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     .eq("user_id", user.id)
 
   if (rolesError) {
-    console.error("Unable to load roles for current user:", rolesError)
+    logError("auth.roles_load_failed", rolesError, { userId: user.id })
   }
 
   const roles = uniqueRoles((roleRows ?? []).map((row) => row.roles?.name))

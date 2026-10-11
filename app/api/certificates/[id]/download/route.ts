@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireUser } from "@/lib/auth/guards"
+import { logError } from "@/lib/logging/logger"
 
 export const runtime = "nodejs"
 
@@ -24,7 +25,7 @@ export async function GET(
       .maybeSingle()
 
     if (error) {
-      console.error("Unable to read certificate record:", error)
+      logError("certificate_download.record_read_failed", error, { certificateId: id })
       return NextResponse.json(
         { error: "Certificate could not be loaded." },
         { status: 503 }
@@ -50,7 +51,7 @@ export async function GET(
       .createSignedUrl(certificate.storage_path, SIGNED_URL_TTL_SECONDS)
 
     if (signError || !signed?.signedUrl) {
-      console.error("Unable to sign certificate download URL:", signError)
+      logError("certificate_download.sign_failed", signError, { certificateId: id })
       return NextResponse.json(
         { error: "Certificate document could not be prepared." },
         { status: 503 }
@@ -62,7 +63,7 @@ export async function GET(
       headers: { "Cache-Control": "no-store" },
     })
   } catch (error: unknown) {
-    console.error("Certificate download error:", error)
+    logError("certificate_download.request_failed", error)
     return NextResponse.json(
       { error: "Certificate document could not be prepared." },
       { status: 500 }

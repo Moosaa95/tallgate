@@ -6,6 +6,7 @@ import {
   rateLimitUnavailableResponse,
   RateLimitUnavailableError,
 } from "@/lib/api/rateLimit"
+import { logError, logWarn } from "@/lib/logging/logger"
 
 /**
  * POST /api/email
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.RESEND_API_KEY
     const from = process.env.RESEND_FROM_EMAIL
     if (!apiKey || !from) {
-      console.warn("Email sending is not configured.")
+      logWarn("email.not_configured")
       return NextResponse.json(
         { error: "Email sending is not configured." },
         { status: 503 }
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     const data = await res.json()
 
     if (!res.ok) {
-      console.error("Resend API error:", data)
+      logError("email.resend_failed", data, { status: res.status })
       return NextResponse.json(
         { error: "The email could not be sent. Please try again later." },
         { status: res.status }
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof RateLimitUnavailableError) {
       return rateLimitUnavailableResponse()
     }
-    console.error("Email API error:", error)
+    logError("email.request_failed", error)
     return NextResponse.json(
       { error: "Internal server error." },
       { status: 500 }

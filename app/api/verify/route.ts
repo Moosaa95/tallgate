@@ -6,6 +6,7 @@ import {
   rateLimitUnavailableResponse,
   RateLimitUnavailableError,
 } from "@/lib/api/rateLimit"
+import { logError } from "@/lib/logging/logger"
 
 function noStore(body: unknown, status: number) {
   return NextResponse.json(body, {
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
     })
 
     if (error) {
-      console.error("Certificate verification query failed:", error)
+      logError("verify.lookup_failed", error)
       return noStore(
         { error: "Certificate verification is temporarily unavailable." },
         503
@@ -79,7 +80,7 @@ export async function GET(req: NextRequest) {
       response.headers.set("Cache-Control", "no-store")
       return response
     }
-    console.error("Certificate verification request failed:", error)
+    logError("verify.request_failed", error)
     return noStore(
       { error: "Certificate verification is temporarily unavailable." },
       503

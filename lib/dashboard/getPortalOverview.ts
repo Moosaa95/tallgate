@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import type { CurrentUser } from "@/lib/auth/guards"
+import { logError } from "@/lib/logging/logger"
 
 export type PortalEnrollment = {
   id: string
@@ -97,7 +98,7 @@ export async function getPortalOverview(user: CurrentUser): Promise<PortalOvervi
     ])
 
   if (exploreError) {
-    console.error("Unable to load courses for exploration:", exploreError)
+    logError("portal.explore_courses_failed", exploreError)
   }
 
   const enrollments: PortalEnrollment[] = (courseEnrollments ?? []).map((row) => ({
@@ -136,11 +137,11 @@ export async function getPortalOverview(user: CurrentUser): Promise<PortalOvervi
     ])
 
     if (modulesResult.error) {
-      console.error("Unable to load enrolled course modules:", modulesResult.error)
+      logError("portal.enrolled_modules_failed", modulesResult.error)
       learningResourcesWarning = "Some course details could not be loaded."
     }
     if (sessionsResult.error) {
-      console.error("Unable to load enrolled course live sessions:", sessionsResult.error)
+      logError("portal.live_sessions_failed", sessionsResult.error)
       learningResourcesWarning = "Some live class details could not be loaded."
     }
 
@@ -155,7 +156,7 @@ export async function getPortalOverview(user: CurrentUser): Promise<PortalOvervi
         .in("module_id", moduleIds)
 
       if (lessonsError) {
-        console.error("Unable to load enrolled course lessons:", lessonsError)
+        logError("portal.enrolled_lessons_failed", lessonsError)
         learningResourcesWarning = "Some course details could not be loaded."
       } else {
         const moduleByCourse = new Map(modules.map((mod) => [mod.id, mod.course_id]))
@@ -190,7 +191,7 @@ export async function getPortalOverview(user: CurrentUser): Promise<PortalOvervi
             .in("lesson_id", lessonIds)
 
           if (progressError) {
-            console.error("Unable to load lesson progress:", progressError)
+            logError("portal.lesson_progress_failed", progressError)
             learningResourcesWarning = "Some course progress details could not be loaded."
           } else {
             for (const row of progressRows ?? []) {

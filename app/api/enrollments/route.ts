@@ -15,6 +15,7 @@ import {
   RateLimitUnavailableError,
 } from "@/lib/api/rateLimit"
 import { resolveEnrollmentCourse } from "@/lib/catalogue/enrollmentCourse"
+import { logError } from "@/lib/logging/logger"
 
 /**
  * POST /api/enrollments
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle()
 
       if (courseError) {
-        console.error("Enrollment course lookup failed:", courseError)
+        logError("enrollment.course_lookup_failed", courseError)
         return NextResponse.json(
           { error: "Enrollment requests are temporarily unavailable." },
           { status: 503 }
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
     ])
 
     if (dbError) {
-      console.error("Enrollment database insert failed:", dbError)
+      logError("enrollment.insert_failed", dbError)
       return NextResponse.json(
         { error: "Enrollment request could not be saved. Please try again." },
         { status: 503 }
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof RateLimitUnavailableError) {
       return rateLimitUnavailableResponse()
     }
-    console.error("Enrollment API error:", error)
+    logError("enrollment.request_failed", error)
     return NextResponse.json(
       { error: "Internal server error." },
       { status: 500 }

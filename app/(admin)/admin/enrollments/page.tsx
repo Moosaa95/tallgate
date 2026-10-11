@@ -4,6 +4,7 @@ import { mockEnrollments, type MockEnrollment } from "@/lib/data/adminMockData"
 import { toEnrollment } from "@/lib/data/adminRowMappers"
 import { ADMIN_QUERY_LIMIT } from "@/lib/admin/queryLimits"
 import EnrollmentsClient from "@/components/admin/EnrollmentsClient"
+import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
   title: "Student Cohorts & Enrollments | TallGate Admin",
@@ -33,7 +34,7 @@ export default async function AdminEnrollmentsPage() {
         .limit(ADMIN_QUERY_LIMIT)
 
       if (error) {
-        console.error("Admin enrollments query failed:", error)
+        logError("admin.enrollments_query_failed", error)
         dataWarning = "Enrollments could not be loaded. This cohort view may be incomplete."
       } else {
         enrollments = (data ?? []).map((item) => toEnrollment(item, "Enrolled Student", "Technical Track"))
@@ -42,7 +43,7 @@ export default async function AdminEnrollmentsPage() {
         }
       }
     } catch (err) {
-      console.error("Admin enrollments query failed:", err)
+      logError("admin.enrollments_query_failed", err)
       dataWarning = "Enrollments could not be loaded. This cohort view may be incomplete."
     }
   }

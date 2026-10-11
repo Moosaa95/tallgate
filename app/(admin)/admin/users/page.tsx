@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/auth/guards"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { ADMIN_QUERY_LIMIT } from "@/lib/admin/queryLimits"
 import UsersClient from "@/components/admin/UsersClient"
+import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
   title: "Users & Roles | TallGate Admin",
@@ -45,7 +46,7 @@ export default async function AdminUsersPage() {
 
     if (error) {
       loadFailed = true
-      console.error("Error fetching users:", error)
+      logError("admin.users_query_failed", error)
       loadWarning = "User records could not be loaded from Supabase."
     } else {
       users = (profiles ?? []).map((p) => {
@@ -80,7 +81,7 @@ export default async function AdminUsersPage() {
     const { data: roles, error: rolesError } = await supabase.from("roles").select("name")
 
     if (rolesError) {
-      console.error("Error fetching roles:", rolesError)
+      logError("admin.roles_query_failed", rolesError)
       loadWarning = loadWarning
         ? `${loadWarning} The role list could not be loaded, so role assignment may be unavailable.`
         : "The role list could not be loaded, so role assignment may be unavailable."

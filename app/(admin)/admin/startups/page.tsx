@@ -4,6 +4,7 @@ import { mockStartups, type MockStartup } from "@/lib/data/adminMockData"
 import { toStartup } from "@/lib/data/adminRowMappers"
 import { ADMIN_QUERY_LIMIT } from "@/lib/admin/queryLimits"
 import StartupsClient from "./StartupsClient"
+import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
   title: "Startup Incubation Pipeline | TallGate Admin",
@@ -33,7 +34,7 @@ export default async function AdminStartupsPage() {
         .limit(ADMIN_QUERY_LIMIT)
 
       if (error) {
-        console.error("Admin startup query failed:", error)
+        logError("admin.startups_query_failed", error)
         dataWarning = "Startup applications could not be loaded. This pipeline may be incomplete."
       } else {
         startups = (data ?? []).map(toStartup)
@@ -42,7 +43,7 @@ export default async function AdminStartupsPage() {
         }
       }
     } catch (err) {
-      console.error("Admin startup query failed:", err)
+      logError("admin.startups_query_failed", err)
       dataWarning = "Startup applications could not be loaded. This pipeline may be incomplete."
     }
   }

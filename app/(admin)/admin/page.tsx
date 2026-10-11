@@ -23,6 +23,7 @@ import {
   type AdminCertificate,
 } from "@/lib/data/adminRowMappers"
 import { ADMIN_QUERY_LIMIT } from "@/lib/admin/queryLimits"
+import { logError } from "@/lib/logging/logger"
 import {
   HiOutlineInboxStack,
   HiOutlineRocketLaunch,
@@ -99,7 +100,7 @@ export default async function AdminOverviewPage() {
 
       if (failures.length > 0) {
         for (const result of [cRes, sRes, crsRes, enrRes, certRes, msgRes]) {
-          if (result.error) console.error("Admin overview query failed:", result.error)
+          if (result.error) logError("admin.overview_query_failed", result.error)
         }
         dataWarning = `Could not load ${failures.join(", ")}. The affected figures below may be understated.`
       }
@@ -112,7 +113,7 @@ export default async function AdminOverviewPage() {
         dataWarning = dataWarning ? `${dataWarning} ${truncationNotice}` : truncationNotice
       }
     } catch (err) {
-      console.error("Admin overview query failed:", err)
+      logError("admin.overview_query_failed", err)
       dataWarning = "Metrics could not be loaded from Supabase. Figures below may be understated."
     }
   }

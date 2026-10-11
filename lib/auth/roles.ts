@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
+import { logError } from "@/lib/logging/logger"
 
 export function uniqueRoles(values: Array<string | null | undefined>) {
   return Array.from(new Set(values.filter((role): role is string => Boolean(role))))
@@ -42,7 +43,7 @@ export async function fetchCurrentRoleNames(
   const { data, error } = await supabase.from("user_roles").select("roles(name)")
 
   if (error) {
-    console.error("Unable to resolve current role names:", error)
+    logError("auth.role_names_load_failed", error)
   }
 
   return uniqueRoles((data ?? []).map((row) => row.roles?.name))

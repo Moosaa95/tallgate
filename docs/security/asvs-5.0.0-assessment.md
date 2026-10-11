@@ -3,7 +3,7 @@
 - **Standard:** OWASP Application Security Verification Standard (ASVS) 5.0.0
 - **Target level:** Level 1 (with Level 2 notes)
 - **Subject:** TallGate web application — Next.js 16 App Router, API route handlers, Supabase (Auth, Postgres with Row Level Security, Storage)
-- **Method:** Manual source review + automated build/test/lint/typecheck + `npm audit`, plus a set of **read-only** live checks against the linked Supabase project on 2026-10-11 (GoTrue settings, PostgREST `SELECT … limit 1` with the publishable vs secret key, Storage list, TLS handshake). No writes, auth flows or penetration testing were performed (see [Limitations](#limitations) and `docs/security/external-configuration-verification.md`).
+- **Method:** Manual source review + automated build/test/lint/typecheck + `npm audit`, plus a set of **read-only** live checks against the linked Supabase project on 2026-10-11 (GoTrue settings, PostgREST `SELECT … limit 1` with the publishable vs secret key, the OpenAPI table inventory, Storage bucket listing, the `verify_certificate` RPC, TLS handshake). No writes, auth flows or penetration testing were performed (see [Limitations](#limitations) and `docs/security/external-configuration-verification.md`).
 - **Status labels:** `PASS` · `FAIL` · `PARTIAL` · `NOT VERIFIED` · `N/A`
 
 > This document is a **static, evidence-based assessment** (with limited read-only live checks), not a penetration test or a certification. Each status is backed by a file/line reference, a test result, or a dated read-only check. Items that depend on external configuration or runtime infrastructure are marked `NOT VERIFIED`.
@@ -72,9 +72,11 @@ Auth-callback regression coverage (`tests/unit/auth-callback.test.ts`) exercises
 
 Limited read-only checks were run against the linked Supabase project `zlmbitphlzokjmfwldcb` using the local `.env.local` credentials (no writes, no auth flows, no secrets printed). Full method and per-ID results are in `docs/security/external-configuration-verification.md`.
 
-- Auth settings (`GET /auth/v1/settings`): all external providers disabled (email only); `disable_signup: false`; `mailer_autoconfirm: true`; `passkeys_enabled: false`.
+- Auth settings (`GET /auth/v1/settings`) + health (`/auth/v1/health`, GoTrue `v2.197.0`): all external providers disabled (email only), `anonymous_users`/`phone` disabled; `disable_signup: false`; `mailer_autoconfirm: true`; `passkeys_enabled: false`; `saml_enabled: false`.
+- Schema exposure (`GET /rest/v1/` OpenAPI, secret key): 20 tables exposed; `admin_audit_log` absent.
 - Authorization: publishable-key `SELECT` returns no rows for `profiles`/`user_roles` while the secret key sees them (count 2), and returns `42501 permission denied` for `payment_requests`/`certificates`/`live_sessions`/`api_rate_limits`; public catalogue tables (`courses` = 6 rows, `course_categories`) read normally.
-- Storage: private `certificates` bucket lists no objects to the publishable key.
+- Storage: exactly two buckets (`course-content`, `certificates`), both `public: false`; private `certificates` bucket lists no objects to the publishable key.
+- Public verification: `POST /rest/v1/rpc/verify_certificate` with the publishable key and a non-existent exact code returns `200 []` (exact-code lookup, no enumeration).
 - TLS: `zlmbitphlzokjmfwldcb.supabase.co:443` negotiates TLS 1.3 with a valid certificate.
 - **Deployment gap (X-11, FAIL):** `GET /rest/v1/admin_audit_log` → `404 PGRST205` to **both** the publishable and secret keys, while all other recent migration tables resolve. The deployed database is one migration behind `main` (`20261011000000_admin_audit_log.sql`, commit `341bd16`, not applied). Until applied, the admin audit feature records nothing in that environment; see `docs/security/migration-deployment-plan.md`.
 
@@ -92,7 +94,7 @@ Each remediation was delivered as an isolated commit with its own regression tes
 ## Limitations
 
 - **No deployed application:** no live web origin, no hosting dashboard, no SQL/DB connection, and no migration-apply path (no Supabase CLI, `SUPABASE_ACCESS_TOKEN`, or DB URL) were available. Migrations were reviewed as source and cross-checked with limited PostgREST probes, but not executed; one migration is unapplied in the target (X-11).
-- **Limited live checks:** the Supabase project was probed read-only (auth settings, table visibility, Storage listing, TLS). This does not replace a dynamic test and covers only the tables/endpoints touched (see X-06).
+- **Limited live checks:** the Supabase project was probed read-only: auth settings/health, PostgREST table visibility plus the OpenAPI table inventory (20 tables), Storage bucket listing and listing denials, the `verify_certificate` RPC, and the TLS handshake. This does not replace a dynamic test and covers only the tables/endpoints touched (see X-06).
 - **External configuration not fully verifiable in-repo:** OAuth/redirect allow-lists, JWT signing keys, MFA/session lifetime, email template bodies, CDN/proxy header behavior, and the app host's TLS live outside this repository (X-01, X-03, X-04, X-05, X-07, X-08, X-09).
 - **No dynamic testing:** no DAST, fuzzing, or penetration test was performed.
 - **No SAST dependency:** only `npm audit` and manual review were used; no dedicated static analysis tool was run.
@@ -108,5 +110,5 @@ Each remediation was delivered as an isolated commit with its own regression tes
 5. **F-27** Add structured, PII-scrubbed logging and a retention policy for `admin_audit_log`.
 6. **F-13, F-14** Document the session-cookie `httpOnly` trade-off and session lifetime.
 7. **F-10 / X-08** Confirm the edge proxy overwrites (not appends) the trusted client-IP headers.
-5. **F-29** Fail fast on missing critical secrets instead of logging a startup warning.
-6. **F-26** Schedule upgrades for dev/build dependency advisories.
+8. **F-29** Fail fast on missing critical secrets instead of logging a startup warning.
+9. **F-26** Schedule upgrades for dev/build dependency advisories.

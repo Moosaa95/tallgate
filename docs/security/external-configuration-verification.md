@@ -66,7 +66,7 @@ See `docs/security/migration-deployment-plan.md` for the X-06/X-11 root-cause an
 ## X-04 — MFA, session lifetime, password policy
 
 - **Status:** PARTIAL (live read-only).
-- **Evidence (live):** `GET /auth/v1/settings` returned `disable_signup: false` (open sign-up), `mailer_autoconfirm: true` (email auto-confirm **on** — see X-05), `phone_autoconfirm: false`, `sms_provider: "twilio"`, `passkeys_enabled: false`, `saml_enabled: false`.
+- **Evidence (live, 2026-10-11):** `GET /auth/v1/settings` returned `disable_signup: false` (open sign-up), `mailer_autoconfirm: true` (email auto-confirm **on** — see X-05), `phone_autoconfirm: false`, `sms_provider: "twilio"`, `passkeys_enabled: false`, `saml_enabled: false`, `external.anonymous_users: false`, `external.phone: false`, `external.email: true`. `saml_private_key_next_configured: true`, but SAML is disabled so no SAML surface is enabled. `/auth/v1/health` reports GoTrue `v2.197.0` healthy.
 - **Not exposed by the API (dashboard required):** MFA enforcement, refresh-token lifetime, idle timeout.
 - **Steps:** Authentication → Policies / Sessions; record refresh-token lifetime, idle timeout and MFA enforcement (screenshots). MFA for admin accounts if the plan permits.
 - **App-side policy:** password minimum is 8 and maximum 128 (`lib/auth/registration.ts`), enforced client- and server-side.
@@ -83,6 +83,9 @@ See `docs/security/migration-deployment-plan.md` for the X-06/X-11 root-cause an
 ## X-06 — RLS, grants, Storage policies and migration state
 
 - **Status:** PARTIAL (live read-only).
+- **Evidence — exposed table inventory:** `GET /rest/v1/` (OpenAPI, secret key) lists **20** tables: `service_inquiries, certificates, api_rate_limits, course_modules, contact_messages, startup_reviews, course_categories, profiles, lesson_progress, services, lessons, startup_applications, payment_requests, consultation_requests, user_roles, lesson_content, course_enrollments, roles, live_sessions, courses`. `admin_audit_log` is **absent**, corroborating the parity gap (X-11).
+- **Evidence — Storage buckets (secret key):** `GET /storage/v1/bucket` returns exactly **two** buckets — `course-content` and `certificates` — both `public: false`. No public bucket exists.
+- **Evidence — public verification RPC:** `POST /rest/v1/rpc/verify_certificate` with the publishable key and a non-existent exact code returns `200 []` (no row), so anonymous clients can verify an exact code but cannot enumerate certificates.
 - **Evidence — RLS enforced (publishable key vs secret key, `SELECT … limit 1`, 2026-10-11):**
 
   | Table | Publishable (anon) | Secret (service) | Interpretation |
@@ -151,7 +154,7 @@ See `docs/security/migration-deployment-plan.md` for the X-06/X-11 root-cause an
 ## X-11 — Deployed schema parity with `main`
 
 - **Status:** **FAIL** (live read-only).
-- **Evidence:** `GET /rest/v1/admin_audit_log` returns `404 PGRST205` to **both** the publishable and secret keys, while all other recent migration tables resolve. The deployed database is one migration behind `main`: `20261011000000_admin_audit_log.sql` (commit `341bd16`) is not applied.
+- **Evidence:** `GET /rest/v1/admin_audit_log` returns `404 PGRST205` to **both** the publishable and secret keys, while all other recent migration tables resolve; the OpenAPI table inventory (`GET /rest/v1/`) lists **20** tables and omits `admin_audit_log`. The deployed database is one migration behind `main`: `20261011000000_admin_audit_log.sql` (commit `341bd16`) is not applied.
 - **Impact:** the admin audit path writes nothing in that environment (the helper fails soft, so admin actions still succeed but are not recorded).
 - **Resolution:** `docs/security/migration-deployment-plan.md` — apply the pending migration through the approved process with authorization, then verify per that plan.
 - **Related findings:** F-15, F-27.

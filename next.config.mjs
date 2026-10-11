@@ -1,8 +1,39 @@
+/**
+ * Content Security Policy.
+ *
+ * Enforced in production; kept report-only in development so that Fast Refresh
+ * (which relies on eval and a websocket) is not broken. Next.js emits inline
+ * hydration scripts, so `script-src` needs `'unsafe-inline'` until a nonce can
+ * be threaded through statically rendered pages; everything not required by the
+ * app (object, frame, base, form targets, external image hosts) is locked down.
+ *
+ * @param {boolean} isDev
+ */
+function buildContentSecurityPolicy(isDev) {
+  return [
+    "default-src 'self'",
+    "img-src 'self' data: blob:",
+    "style-src 'self' 'unsafe-inline'",
+    isDev
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+      : "script-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",
+    isDev
+      ? "connect-src 'self' https://*.supabase.co ws: wss:"
+      : "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: process.cwd(),
   poweredByHeader: false,
   async headers() {
+    const isDev = process.env.NODE_ENV !== "production";
     return [
       {
         source: "/:path*",
@@ -19,18 +50,10 @@ const nextConfig = {
             value: "max-age=63072000; includeSubDomains; preload",
           },
           {
-            key: "Content-Security-Policy-Report-Only",
-            value: [
-              "default-src 'self'",
-              "img-src 'self' data: blob: https:",
-              "style-src 'self' 'unsafe-inline'",
-              "script-src 'self' 'unsafe-inline'",
-              "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co",
-              "frame-ancestors 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-            ].join("; "),
+            key: isDev
+              ? "Content-Security-Policy-Report-Only"
+              : "Content-Security-Policy",
+            value: buildContentSecurityPolicy(isDev),
           },
         ],
       },

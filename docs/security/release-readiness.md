@@ -1,7 +1,7 @@
 # Release Readiness — TallGate
 
 - **Scope:** Go/no-go summary based on the ASVS 5.0.0 assessment (`docs/security/asvs-5.0.0-assessment.md`) and the external-configuration verification (`docs/security/external-configuration-verification.md`).
-- **Repository state referenced:** `main` through commit `2a222fb` plus the Batch 7 documentation commit (see `git log`). Working tree clean, 13 commits ahead of `origin/main` before this batch.
+- **Repository state referenced:** `main` through commit `aafaca6`, plus the Batch 8 documentation commit (see `git log`). Working tree clean, 14 commits ahead of `origin/main` before this batch.
 - **Nature of this document:** an in-repo review with **limited read-only live checks** (2026-10-11). It is **not** a penetration test and does not certify a deployed instance.
 
 ## Automated gates (re-run 2026-10-11)
@@ -38,7 +38,7 @@ CI (`.github/workflows/ci.yml`) runs the build/test/lint/typecheck gates on Node
 
 ## Critical / high-priority blockers
 
-1. **Deployed schema is behind `main` (HIGH).** `public.admin_audit_log` is absent in the linked project (`404 PGRST205`); `20261011000000_admin_audit_log.sql` is not applied. The audit feature silently records nothing there.
+1. **Deployed schema is behind `main` (HIGH, X-11 `FAIL`).** `public.admin_audit_log` is absent in the linked project (`404 PGRST205` for both the publishable and secret keys); `20261011000000_admin_audit_log.sql` is not applied. The audit feature silently records nothing there. Safe apply/verify plan: `docs/security/migration-deployment-plan.md`.
 2. **X-01 redirect allow-list `NOT VERIFIED` (HIGH).** Dashboard-only; governs email-link `redirect_to`.
 3. **X-09 production secrets `NOT VERIFIED` (HIGH).** Local `.env.local` is fully configured, but the production/CI runtime was not inspected.
 4. **X-05 email templates `NOT VERIFIED` + F-31 (MEDIUM).** Cross-device template unconfirmed; live project auto-confirms emails.
@@ -48,7 +48,7 @@ CI (`.github/workflows/ci.yml`) runs the build/test/lint/typecheck gates on Node
 
 ## Pre-release checklist
 
-1. Apply `20261011000000_admin_audit_log.sql` (README order) and verify admins-only SELECT.
+1. Apply `20261011000000_admin_audit_log.sql` per `docs/security/migration-deployment-plan.md` and verify admins-only SELECT plus effective RLS after the change.
 2. Verify X-01 (redirect allow-list), X-05 (email templates) and X-09 (production secrets) with evidence.
 3. Confirm X-08 (edge overwrites trusted client-IP headers).
 4. Run a TLS scan against the production origin (X-07).
@@ -60,5 +60,5 @@ CI (`.github/workflows/ci.yml`) runs the build/test/lint/typecheck gates on Node
 **NOT READY** for production.
 
 - Automated checks and the in-repo controls pass, and live read-only checks confirmed working RLS and disabled OAuth providers.
-- Production go-live is blocked by the **deployed migration gap** and by **`NOT VERIFIED` required external controls (X-01, X-09; plus X-05/X-07/X-08)**. Per policy, production deployment must not be recommended while required external controls remain unverified.
+- Production go-live is blocked by the **deployed migration gap (X-11 `FAIL`)** and by **`NOT VERIFIED` required external controls (X-01, X-09; plus X-05/X-07/X-08)**. Per policy, production deployment must not be recommended while required external controls remain unverified.
 - Applying the pending migration and completing X-01/X-09 (then X-05/X-07/X-08) would move the assessment to a credible **READY FOR STAGING** / **PRODUCTION REVIEW** state.

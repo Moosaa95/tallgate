@@ -2,6 +2,7 @@
 
 - **Scope:** security-relevant settings that live outside this repository (Supabase project, hosting/CDN/proxy, email provider).
 - **Method (revised 2026-10-11):** In addition to source review, a set of **read-only** checks was run against the linked Supabase project using the credentials in the local `.env.local`. No writes, no auth flows, and no data modifications were performed, and no secret values were printed. See [Verification environment](#verification-environment).
+- **Batch 8B note (2026-10-11):** no dashboard, management-API, CLI, or production-origin access was available, so X-01, X-03, X-05, X-07 (app host) and X-08 could not be re-verified and remain `NOT VERIFIED`; the manual steps below are the required next action. X-09 remains `PARTIAL` (local runtime verified, production runtime not).
 - **Rule:** Do not record secret values here. For environment variables, record only `CONFIGURED` / `NOT CONFIGURED` (presence), never their contents.
 - **`NOT VERIFIED` ≠ safe.** These items indicate missing evidence, not an absence of risk.
 
@@ -31,6 +32,9 @@
 | X-08 | Edge proxy overrides trusted client-IP headers | NOT VERIFIED | Proxy/CDN config required |
 | X-09 | Production secrets present in the runtime environment | PARTIAL | Local `.env.local` only; production runtime unverified |
 | X-10 | `npm audit` on the deployed dependency set | PARTIAL | Local lockfile only |
+| X-11 | Deployed schema parity with `main` | **FAIL** | Live read-only |
+
+See `docs/security/migration-deployment-plan.md` for the X-06/X-11 root-cause analysis and the safe apply/verify plan.
 
 ---
 
@@ -138,3 +142,11 @@
 - **Status:** PARTIAL. Verified on the local lockfile; the deployed set is assumed identical.
 - **Evidence (2026-10-11):** `npm audit --omit=dev` → **0 vulnerabilities**; `npm audit` → **9 advisories (2 moderate, 7 high)**, all in dev/build tooling (Tailwind/PostCSS/eslint chain).
 - **Steps:** Run `npm audit --omit=dev` against the exact lockfile deployed (or a `npm ci` in the deploy image) and confirm the runtime tree is clean.
+
+## X-11 — Deployed schema parity with `main`
+
+- **Status:** **FAIL** (live read-only).
+- **Evidence:** `GET /rest/v1/admin_audit_log` returns `404 PGRST205` to **both** the publishable and secret keys, while all other recent migration tables resolve. The deployed database is one migration behind `main`: `20261011000000_admin_audit_log.sql` (commit `341bd16`) is not applied.
+- **Impact:** the admin audit path writes nothing in that environment (the helper fails soft, so admin actions still succeed but are not recorded).
+- **Resolution:** `docs/security/migration-deployment-plan.md` — apply the pending migration through the approved process with authorization, then verify per that plan.
+- **Related findings:** F-15, F-27.

@@ -12,10 +12,10 @@
 
 | Status | Count |
 | ------ | ----- |
-| PASS | 16 |
+| PASS | 17 |
 | FAIL | 0 |
 | PARTIAL | 11 |
-| NOT VERIFIED | 1 |
+| NOT VERIFIED | 0 |
 | N/A | 3 |
 
 The four findings originally marked `FAIL` have been remediated in isolated sub-batches (see [Remediation log](#remediation-log)); two are now `PASS` and two improved to `PARTIAL` because a residual hardening step remains.
@@ -38,9 +38,9 @@ The four findings originally marked `FAIL` have been remediated in isolated sub-
 | F-12 | V6, V10 | Callback redirect on failure uses `?error=auth`, but the login page does not render it (dead parameter, no user-visible feedback) | PARTIAL | `app/auth/callback/route.ts:42`; `app/(auth)/login/page.tsx` reads `next` but not `error` | Either render the error on `/login` or drop the unused parameter |
 | F-13 | V7.1 | Session cookies: `SameSite=Lax`, `Secure` in production, `path=/`; **`httpOnly` is false** (Supabase SSR default) so session tokens are readable by JavaScript. The trade-off, compensating controls, and revisit criteria are now documented | PARTIAL | `lib/supabase/cookieOptions.ts:1-5`; `docs/security/session-management.md`; `node_modules/@supabase/ssr/dist/module/utils/constants.js:4` | Accepted and documented; revisit only by adopting a server-only session pattern |
 | F-14 | V7.1 | Session inactivity/absolute lifetime and re-authentication expectations are documented; the hosted Supabase project manages the values (dashboard-verified values still required) | PASS | `docs/security/session-management.md`; `lib/supabase/middleware.ts:56-68` | None (confirm dashboard values at deploy) |
-| F-15 | V8.1, V8.2 | Function-level and data-level authorization: proxy gating on protected prefixes using `getUser()`, `requireAdmin()` guards, RLS enabled on **21** tables with **62** policies, single-role-per-user, admin RPCs `SECURITY DEFINER` + `is_admin()` | PASS | Source: `proxy.ts:4-11`, `lib/supabase/middleware.ts:20-71`; 21 × `ENABLE ROW LEVEL SECURITY`, 62 × `CREATE POLICY`, 9 × `SECURITY DEFINER`. Live (2026-10-11, publishable key vs secret key): `profiles`/`user_roles` return 0 rows to anon but exist (count 2) for the service role; `payment_requests`/`certificates`/`live_sessions`/`api_rate_limits` return `42501 permission denied`; private `certificates` bucket lists no objects to anon (X-06) | Deployed schema is one migration behind `main` (X-11); the unapplied migration only adds the audit table |
+| F-15 | V8.1, V8.2 | Function-level and data-level authorization: proxy gating on protected prefixes using `getUser()`, `requireAdmin()` guards, RLS enabled on **21** tables with **62** policies, single-role-per-user, admin RPCs `SECURITY DEFINER` + `is_admin()` | PASS | Source: `proxy.ts:4-11`, `lib/supabase/middleware.ts:20-71`; 21 × `ENABLE ROW LEVEL SECURITY`, 62 × `CREATE POLICY`, 9 × `SECURITY DEFINER`. Live (2026-10-11, publishable key vs secret key): `profiles`/`user_roles` return 0 rows to anon but exist (count 2) for the service role; `payment_requests`/`certificates`/`live_sessions`/`api_rate_limits` return `42501 permission denied`; private `certificates` bucket lists no objects to anon (X-06) | Deployed schema now at parity (X-11 resolved 2026-10-11); migrations applied and verified |
 | F-16 | V8.1 | No super-admin: any admin can change another admin's role (self-change blocked) | PARTIAL | `app/api/admin/actions/route.ts` (`update_user_role`; `assignUserRole`) | Add a protected owner role or document the accepted risk |
-| F-17 | V9.1 | Self-contained token validation delegated to Supabase Auth (JWT signature verification) | NOT VERIFIED | No custom token handling; verification performed inside `@supabase/*` | Verify Supabase JWT verification settings; no app-level claim to make |
+| F-17 | V9.1 | Self-contained token validation delegated to Supabase Auth (JWT signature verification) | PARTIAL | No custom token handling; verification performed inside `@supabase/*`. Live/Management API (2026-10-11): `jwt_exp = 3600`; project secrets include a managed `SUPABASE_JWKS` entry (asymmetric JWKS signing keys) | Confirm signing-key type/rotation via dashboard or signing-keys API; no app-level claim to make |
 | F-18 | V5.1, V5.3 | File handling: no user-facing uploads; certificate PDFs are server-generated into a private bucket | N/A | No upload handlers found; `supabase/migrations/20261003000000_storage_buckets_and_grants.sql`, `20261007160000_harden_course_content_storage_policies.sql` | None |
 | F-19 | V10.1 | OAuth/OIDC (Google, GitHub) | N/A | Live (2026-10-11): `GET /auth/v1/settings` reports **every** external provider disabled (`google`, `github`, … all `false`) with `email` only; the sign-in page uses only `signInWithPassword` (`app/(auth)/login/page.tsx`), and no `signInWithOAuth` exists in the codebase. The callback still accepts a PKCE `code` for same-browser links | If OAuth is a product requirement it must be implemented and enabled; meanwhile the redirect allow-list (X-01) still governs email-link `redirect_to` |
 | F-20 | V11.2, V11.3 | Cryptography: no custom crypto in app code; HMAC-SHA256 used only to hash rate-limit keys | PASS | `lib/api/rateLimit.ts:73-76` | None |
@@ -50,7 +50,7 @@ The four findings originally marked `FAIL` have been remediated in isolated sub-
 | F-24 | V14.1, V14.2 | Data protection: no payment-card data stored (`payment_requests` records status only); RLS on user data; private storage buckets; secrets never exposed via `NEXT_PUBLIC_*` | PASS | `supabase/migrations/20261007130000_payment_requests.sql`; `lib/supabase/admin.ts`; env naming | None |
 | F-25 | V15.1 | Dependency management: production dependencies have **0** known vulnerabilities | PASS | `npm audit --omit=dev` → `found 0 vulnerabilities` | None |
 | F-26 | V15.1 | Build-time/dev dependencies carry advisories (7 high, 2 moderate) in the Tailwind/PostCSS/eslint chain | PARTIAL | `npm audit` → 9 advisories, fixes require breaking major upgrades | Schedule dependency upgrades; not shipped to the runtime bundle |
-| F-27 | V16.1, V16.2 | Admin actions write a durable audit record (actor, action, target, outcome) via the service role, readable by admins only; audit-write failures emit a structured, value-free log event; a `purge_admin_audit_log(days)` retention routine (SECURITY DEFINER, `service_role` only) is added but **unapplied**. App-wide structured logging is now provided by a shared logger (`lib/logging/logger.ts`) that emits redacted, length-bounded JSON events and is adopted across API route handlers, server actions and shared server modules (auth, audit, rate-limit, catalogue, dashboard, learning) | PARTIAL | `supabase/migrations/20261011000000_admin_audit_log.sql`, `supabase/migrations/20261011000001_admin_audit_log_retention.sql`, `lib/admin/auditLog.ts`, `lib/logging/logger.ts`; tests `tests/unit/admin-audit-log.test.ts` (10 passing), `tests/unit/logger.test.ts` (10 passing) | Apply both migrations |
+| F-27 | V16.1, V16.2 | Admin actions write a durable audit record (actor, action, target, outcome) via the service role, readable by admins only; audit-write failures emit a structured, value-free log event; a `purge_admin_audit_log(days)` retention routine (SECURITY DEFINER, `service_role` only) is added and **applied and verified (X-11)**. App-wide structured logging is provided by a shared logger (`lib/logging/logger.ts`) that emits redacted, length-bounded JSON events and is adopted across API route handlers, server actions and shared server modules (auth, audit, rate-limit, catalogue, dashboard, learning) | PASS | `supabase/migrations/20261011000000_admin_audit_log.sql`, `supabase/migrations/20261011000001_admin_audit_log_retention.sql`, `lib/admin/auditLog.ts`, `lib/logging/logger.ts`; tests `tests/unit/admin-audit-log.test.ts` (10 passing), `tests/unit/logger.test.ts` (10 passing); applied 2026-10-11 and verified (`relrowsecurity=true`, admin-read policy, anon denied, retention fn `service_role`-only) | None (migrations applied 2026-10-11) |
 | F-28 | V16.3, V16.4 | Error handling: generic client-facing errors and error boundaries | PASS | `app/error.tsx`, `app/not-found.tsx` | None |
 | F-29 | V13.2, V14.2 | The server now **fails fast** at startup in production when a critical secret is absent, via `instrumentation.ts` → `assertCriticalEnv()` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL`); skipped during `next build` so secret-less CI builds still succeed | PASS | `instrumentation.ts`, `lib/config/env.ts`; tests `tests/unit/env.test.ts` (5 passing) | None |
 | F-30 | V17.1 | WebRTC | N/A | No WebRTC usage in the codebase | None |
@@ -73,12 +73,13 @@ Auth-callback regression coverage (`tests/unit/auth-callback.test.ts`) exercises
 Limited read-only checks were run against the linked Supabase project `zlmbitphlzokjmfwldcb` using the local `.env.local` credentials (no writes, no auth flows, no secrets printed). Full method and per-ID results are in `docs/security/external-configuration-verification.md`.
 
 - Auth settings (`GET /auth/v1/settings`) + health (`/auth/v1/health`, GoTrue `v2.197.0`): all external providers disabled (email only), `anonymous_users`/`phone` disabled; `disable_signup: false`; `mailer_autoconfirm: true`; `passkeys_enabled: false`; `saml_enabled: false`.
-- Schema exposure (`GET /rest/v1/` OpenAPI, secret key): 20 tables exposed; `admin_audit_log` absent.
+- Schema exposure: before the apply, the OpenAPI inventory (secret key) exposed 20 tables with `admin_audit_log` absent; after the 2026-10-11 apply it is present and RLS-protected (publishable key → `42501 permission denied`).
 - Authorization: publishable-key `SELECT` returns no rows for `profiles`/`user_roles` while the secret key sees them (count 2), and returns `42501 permission denied` for `payment_requests`/`certificates`/`live_sessions`/`api_rate_limits`; public catalogue tables (`courses` = 6 rows, `course_categories`) read normally.
 - Storage: exactly two buckets (`course-content`, `certificates`), both `public: false`; private `certificates` bucket lists no objects to the publishable key.
 - Public verification: `POST /rest/v1/rpc/verify_certificate` with the publishable key and a non-existent exact code returns `200 []` (exact-code lookup, no enumeration).
 - TLS: `zlmbitphlzokjmfwldcb.supabase.co:443` negotiates TLS 1.3 with a valid certificate.
-- **Deployment gap (X-11, FAIL):** `GET /rest/v1/admin_audit_log` → `404 PGRST205` to **both** the publishable and secret keys, while all other recent migration tables resolve. The deployed database is one migration behind `main` (`20261011000000_admin_audit_log.sql`, commit `341bd16`, not applied). Until applied, the admin audit feature records nothing in that environment; see `docs/security/migration-deployment-plan.md`.
+- **Deployment gap (X-11) — RESOLVED (2026-10-11):** the remote ledger was out of sync by five migrations; all five were applied via `supabase db push --linked`, `supabase migration list --linked` is back in sync, and `admin_audit_log` is verified (RLS on, `"Admins can read the audit log"` policy, anon denied, retention function `SECURITY DEFINER` / `service_role`-only). See `docs/security/migration-deployment-plan.md`.
+- **Auth config (read-only, Management API):** `site_url = http://localhost:3000` with an empty `uri_allow_list`, and email templates use `{{ .ConfirmationURL }}` on a project with `mailer_autoconfirm: true` — see X-01/X-05; hosted session values are 1h JWT, refresh rotation on, no inactivity/absolute timeout; `password_min_length = 6`.
 
 ## Remediation log
 
@@ -90,10 +91,11 @@ Each remediation was delivered as an isolated commit with its own regression tes
 | F-04 | `FAIL` → `PASS` | `0543934` | Registration and reset share one password rule (≥8, ≤128) via `lib/auth/registration.ts` |
 | F-27 | `FAIL` → `PARTIAL` | `341bd16` | Append-only `admin_audit_log` (migration + `lib/admin/auditLog.ts` + route wiring + tests) |
 | F-07 | `FAIL` → `PARTIAL` | `c3a92fe` | CSP enforced in production, `img-src`/`object-src` tightened; `'unsafe-inline'` scripts remain (no nonce yet) |
+| X-11 | `FAIL` → `PASS` | (deployment) | Applied 5 pending migrations via `supabase db push --linked`; verified schema/RLS/policy/grants/retention (2026-10-11) |
 
 ## Limitations
 
-- **No deployed application:** no live web origin, no hosting dashboard, no SQL/DB connection, and no migration-apply path (no Supabase CLI, `SUPABASE_ACCESS_TOKEN`, or DB URL) were available. Migrations were reviewed as source and cross-checked with limited PostgREST probes, but not executed; one migration is unapplied in the target (X-11).
+- **No deployed application:** no live web origin, hosting dashboard, or app-host access was available. The **database** migration gap was closed on 2026-10-11 (X-11 `PASS`) using the Supabase CLI's stored credential and the Management API read-only SQL endpoint; migrations are now applied in the linked project.
 - **Limited live checks:** the Supabase project was probed read-only: auth settings/health, PostgREST table visibility plus the OpenAPI table inventory (20 tables), Storage bucket listing and listing denials, the `verify_certificate` RPC, and the TLS handshake. This does not replace a dynamic test and covers only the tables/endpoints touched (see X-06).
 - **External configuration not fully verifiable in-repo:** OAuth/redirect allow-lists, JWT signing keys, MFA/session lifetime, email template bodies, CDN/proxy header behavior, and the app host's TLS live outside this repository (X-01, X-03, X-04, X-05, X-07, X-08, X-09).
 - **No dynamic testing:** no DAST, fuzzing, or penetration test was performed.
@@ -103,11 +105,11 @@ Each remediation was delivered as an isolated commit with its own regression tes
 
 ## Remaining gaps (prioritized)
 
-1. **Apply the pending migrations** `20261011000000_admin_audit_log.sql` and `20261011000001_admin_audit_log_retention.sql` (X-11 `FAIL`; safe plan in `docs/security/migration-deployment-plan.md`) and re-verify the audit-log read policy.
-2. **X-01 / X-09** Verify the Supabase redirect allow-list and the production runtime secrets (dashboard + hosting).
-3. **F-31** Decide on email verification: live `mailer_autoconfirm` is `true` (addresses not confirmed).
-4. **F-07** Drop `'unsafe-inline'` from `script-src` only via full dynamic rendering + nonces; hash-based SRI was verified insufficient (inline flight scripts; vercel/next.js#95353 / #95354).
-5. **F-13 / F-14** Confirm the hosted Supabase session lifetime/refresh values against `docs/security/session-management.md`.
-6. **F-27** Apply the retention migration; broader structured logging is now in place (`lib/logging/logger.ts`).
+1. **X-01 / X-05 (HIGH)** Set the Supabase Site URL + redirect allow-list to the production origin, and switch the email templates to the app's `token_hash` cross-device pattern — read-only evidence shows both are currently misconfigured (`site_url=localhost`, empty allow-list, default `{{ .ConfirmationURL }}` templates). Confirm whether `zlmbitphlzokjmfwldcb` is dev or production.
+2. **X-09** Verify the production runtime secrets (hosting platform); presence only, never the values.
+3. **X-11** RESOLVED — migrations applied and verified 2026-10-11; optionally exercise one authorized admin action end-to-end.
+4. **F-31** Decide on email verification: live `mailer_autoconfirm` is `true` (addresses not confirmed).
+5. **F-07** Drop `'unsafe-inline'` from `script-src` only via full dynamic rendering + nonces; hash-based SRI was verified insufficient (inline flight scripts; vercel/next.js#95353 / #95354).
+6. **F-13 / F-14** Record the now-retrieved hosted session values (1h JWT, refresh rotation on, **no** inactivity/absolute timeout) in `docs/security/session-management.md`.
 7. **F-10 / X-08** Confirm the edge proxy overwrites (not appends) the trusted client-IP headers.
 8. **F-26** Schedule upgrades for dev/build dependency advisories.

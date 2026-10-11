@@ -26,6 +26,7 @@ import {
 } from "@/lib/admin/auditLog"
 import type { Database } from "@/types/supabase"
 import { isNonEmptyString, isOneOf, isRecord } from "@/lib/utils"
+import { logError, logWarn } from "@/lib/logging/logger"
 
 export const runtime = "nodejs"
 
@@ -35,7 +36,7 @@ export const runtime = "nodejs"
  * can disclose schema, constraint, and column names.
  */
 function genericDbError(context: string, error: unknown): string {
-  console.error(context, error)
+  logError("admin_action.db_error", error, { operation: context })
   return "The operation could not be completed. Please try again."
 }
 
@@ -111,7 +112,7 @@ async function loadCertificateLogo(): Promise<string | undefined> {
   } catch (error) {
     // Issuance still succeeds, but the PDF is produced without the brand logo.
     // Logged as an error because this is a silent degradation of the output.
-    console.error("Certificate logo could not be loaded; issuing without it:", error)
+    logWarn("admin_action.certificate_logo_unavailable", { error })
     return undefined
   }
 }
@@ -127,7 +128,7 @@ async function rollbackCertificate(
 ) {
   const { error } = await supabase.from("certificates").delete().eq("id", certificateId)
   if (error) {
-    console.error(`Failed to roll back certificate ${certificateId}:`, error)
+    logError("admin_action.certificate_rollback_failed", error, { certificateId })
   }
 }
 
@@ -137,7 +138,7 @@ async function removeCertificateFile(
 ) {
   const { error } = await storageClient.storage.from(CERTIFICATE_BUCKET).remove([storagePath])
   if (error) {
-    console.error(`Failed to remove orphaned certificate file ${storagePath}:`, error)
+    logError("admin_action.certificate_file_remove_failed", error, { storagePath })
   }
 }
 
@@ -434,7 +435,7 @@ async function handleAdminAction(
             { onConflict: "name", ignoreDuplicates: true }
           )
         if (categoryError) {
-          console.error("Course domain category sync failed:", categoryError)
+          logError("admin_action.course_category_sync_failed", categoryError)
         }
 
         return NextResponse.json({ success: true, message: "Course domain updated" })
@@ -587,13 +588,13 @@ async function handleAdminAction(
           .insert({ course_id: createdCourse.id, title: CANONICAL_MODULE_TITLE, order_index: 0 })
 
         if (moduleError) {
-          console.error("Course module creation failed:", moduleError)
+          logError("admin_action.course_module_creation_failed", moduleError)
           const { error: draftError } = await supabase
             .from("courses")
             .update({ is_published: false })
             .eq("id", createdCourse.id)
           if (draftError) {
-            console.error("Failed to set new course back to draft:", draftError)
+            logError("admin_action.course_draft_revert_failed", draftError)
           }
           return NextResponse.json(
             {
@@ -815,7 +816,7 @@ async function handleAdminAction(
         try {
           certificateAdminClient = createAdminClient()
         } catch (error: unknown) {
-          console.error("Certificate learner lookup is unavailable:", error)
+          logError("admin_action.certificate_learner_lookup_failed", error)
           return NextResponse.json(
             { error: "Certificate issuance is temporarily unavailable." },
             { status: 503 }
@@ -828,7 +829,7 @@ async function handleAdminAction(
           .eq("name", "learner")
           .maybeSingle()
         if (learnerRoleError || !learnerRole) {
-          console.error("Certificate issuance could not resolve learner role:", learnerRoleError)
+          logError("admin_action.certificate_learner_role_failed", learnerRoleError)
           return NextResponse.json({ error: "Learner accounts could not be verified." }, { status: 503 })
         }
 
@@ -848,7 +849,9 @@ async function handleAdminAction(
           ])
 
         if (profileError || assignmentError) {
-          console.error("Certificate learner account verification failed:", { profileError, assignmentError })
+          logError("admin_action.certificate_learner_verification_failed", profileError, {
+            assignmentError,
+          })
           return NextResponse.json({ error: "Learner account could not be verified." }, { status: 503 })
         }
         if (!learnerProfile || !roleAssignment) {
@@ -972,7 +975,7 @@ async function handleAdminAction(
         }
 
         if (insertError || !issuedCertificate) {
-          console.error("Certificate issuance failed:", insertError)
+          logError("admin_action.certificate_issuance_failed", insertError)
           return NextResponse.json(
             { error: "Certificate could not be issued. Please try again." },
             { status: 503 }
@@ -984,7 +987,7 @@ async function handleAdminAction(
         try {
           storageClient = createAdminClient()
         } catch (error) {
-          console.error("Service role client unavailable for certificate upload:", error)
+          logError("admin_action.service_client_unavailable", error)
           await rollbackCertificate(supabase, issuedCertificate.id)
           return NextResponse.json(
             { error: "Certificate could not be issued. Storage is not configured." },
@@ -1006,7 +1009,7 @@ async function handleAdminAction(
             logo_src: await loadCertificateLogo(),
           })
         } catch (error) {
-          console.error("Certificate PDF generation failed:", error)
+          logError("admin_action.certificate_pdf_generation_failed", error)
           await rollbackCertificate(supabase, issuedCertificate.id)
           return NextResponse.json(
             { error: "Certificate could not be issued. PDF generation failed." },
@@ -1022,7 +1025,7 @@ async function handleAdminAction(
           })
 
         if (uploadError) {
-          console.error("Certificate PDF upload failed:", uploadError)
+          logError("admin_action.certificate_pdf_upload_failed", uploadError)
           await rollbackCertificate(supabase, issuedCertificate.id)
           return NextResponse.json(
             { error: "Certificate could not be issued. PDF upload failed." },
@@ -1036,7 +1039,7 @@ async function handleAdminAction(
           .eq("id", issuedCertificate.id)
 
         if (persistError) {
-          console.error("Certificate storage path could not be persisted:", persistError)
+          logError("admin_action.certificate_storage_path_persist_failed", persistError)
           await removeCertificateFile(storageClient, storagePath)
           await rollbackCertificate(supabase, issuedCertificate.id)
           return NextResponse.json(
@@ -1241,7 +1244,7 @@ async function handleAdminAction(
         })
 
         if (error) {
-          console.error("Payment status update failed:", error)
+          logError("admin_action.payment_status_update_failed", error)
           const mapped = paymentStatusError(error)
           return NextResponse.json({ error: mapped.message }, { status: mapped.status })
         }
@@ -1274,7 +1277,7 @@ async function handleAdminAction(
         try {
           adminSupabase = createAdminClient()
         } catch (error: unknown) {
-          console.error("Admin client unavailable for user creation:", error)
+          logError("admin_action.admin_client_unavailable", error)
           return NextResponse.json(
             { error: "User management is temporarily unavailable." },
             { status: 503 }
@@ -1299,7 +1302,7 @@ async function handleAdminAction(
         })
 
         if (authError || !authData.user) {
-          console.error("Admin create_user failed:", authError)
+          logError("admin_action.create_user_failed", authError)
           return NextResponse.json(
             {
               error:
@@ -1318,7 +1321,7 @@ async function handleAdminAction(
             .single()
 
           if (profileReadError || !createdProfile) {
-            console.error("Created user's trigger-managed profile could not be read:", profileReadError)
+            logError("admin_action.created_user_profile_read_failed", profileReadError)
             return NextResponse.json(
               { error: "User was created, but its profile could not be verified." },
               { status: 503 }
@@ -1332,7 +1335,7 @@ async function handleAdminAction(
               .eq("id", newUserId)
 
             if (profileUpdateError) {
-              console.error("Created user's profile name could not be updated:", profileUpdateError)
+              logError("admin_action.created_user_profile_update_failed", profileUpdateError)
               return NextResponse.json(
                 { error: "User was created, but the profile name could not be updated." },
                 { status: 503 }
@@ -1344,7 +1347,7 @@ async function handleAdminAction(
         const assignResult = await assignUserRole(adminSupabase, newUserId, roleData.id)
 
         if (assignResult.error) {
-          console.error("Created user's role could not be assigned:", assignResult.error)
+          logError("admin_action.created_user_role_assign_failed", assignResult.error)
           return NextResponse.json(
             {
               error: `User was created, but the role could not be assigned: ${assignResult.error}. Assign the role from the users list.`,
@@ -1379,7 +1382,7 @@ async function handleAdminAction(
         try {
           adminSupabase = createAdminClient()
         } catch (error: unknown) {
-          console.error("Admin client unavailable for role update:", error)
+          logError("admin_action.admin_client_unavailable", error)
           return NextResponse.json(
             { error: "User management is temporarily unavailable." },
             { status: 503 }
@@ -1421,7 +1424,7 @@ async function handleAdminAction(
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }
   } catch (error: unknown) {
-    console.error("Admin action API error:", error)
+    logError("admin_action.unhandled", error)
     return NextResponse.json({ error: "The operation could not be completed. Please try again." }, { status: 500 })
   }
 }

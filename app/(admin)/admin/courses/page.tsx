@@ -6,6 +6,7 @@ import { coursesData } from "@/lib/data/courses"
 import { toCourse } from "@/lib/data/adminRowMappers"
 import { ADMIN_QUERY_LIMIT } from "@/lib/admin/queryLimits"
 import CoursesClient from "@/components/admin/CoursesClient"
+import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
   title: "Course Curriculum Management | TallGate Admin",
@@ -43,7 +44,7 @@ export default async function AdminCoursesPage() {
       ])
 
       if (coursesResult.error) {
-        console.error("Admin courses query failed:", coursesResult.error)
+        logError("admin.courses_query_failed", coursesResult.error)
         dataWarning = "Courses could not be loaded. This catalogue may be incomplete."
       } else {
         courses = (coursesResult.data ?? []).map(toCourse)
@@ -53,12 +54,12 @@ export default async function AdminCoursesPage() {
       }
 
       if (categoriesResult.error) {
-        console.error("Admin course categories query failed:", categoriesResult.error)
+        logError("admin.course_categories_query_failed", categoriesResult.error)
       } else if (categoriesResult.data && categoriesResult.data.length > 0) {
         knownDomains = categoriesResult.data.map((category) => category.name)
       }
     } catch (err) {
-      console.error("Admin courses query failed:", err)
+      logError("admin.courses_query_failed", err)
       dataWarning = "Courses could not be loaded. This catalogue may be incomplete."
     }
   }

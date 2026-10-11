@@ -3,6 +3,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { requireUser } from "@/lib/auth/guards"
 import { formatCertificateIssueDate } from "@/lib/certificates/date"
 import { HiOutlineIdentification } from "react-icons/hi2"
+import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
   title: "My Certificates | TallGate",
@@ -34,13 +35,13 @@ export default async function DashboardCertificatesPage() {
         .order("issue_date", { ascending: false })
 
       if (error) {
-        console.error("Unable to load learner certificates:", error)
+        logError("dashboard.certificates_load_failed", error, { userId: user.id })
         loadFailed = true
       } else {
         certificates = data ?? []
       }
     } catch (error) {
-      console.error("Unable to load learner certificates:", error)
+      logError("dashboard.certificates_load_failed", error, { userId: user.id })
       loadFailed = true
     }
   } else {

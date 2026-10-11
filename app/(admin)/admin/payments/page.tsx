@@ -2,6 +2,7 @@ import React from "react"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { ADMIN_QUERY_LIMIT } from "@/lib/admin/queryLimits"
 import PaymentsClient from "@/components/admin/PaymentsClient"
+import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
   title: "Payment Requests | TallGate Admin",
@@ -53,7 +54,7 @@ export default async function AdminPaymentsPage() {
 
     if (error) {
       loadFailed = true
-      console.error("Error fetching payment requests:", error)
+      logError("admin.payment_requests_load_failed", error)
       loadWarning =
         "Payment requests could not be loaded. Check that the payment_requests migration has been applied."
     } else {
@@ -67,7 +68,7 @@ export default async function AdminPaymentsPage() {
     }
 
     if (coursesResult.error) {
-      console.error("Error fetching courses for payments:", coursesResult.error)
+      logError("admin.payments_courses_load_failed", coursesResult.error)
       loadWarning = loadWarning
         ? `${loadWarning} The course list could not be loaded, so new requests cannot be linked to a course.`
         : "The course list could not be loaded, so new requests cannot be linked to a course."
@@ -76,7 +77,7 @@ export default async function AdminPaymentsPage() {
     }
 
     if (learnersResult.error) {
-      console.error("Error fetching profiles for payments:", learnersResult.error)
+      logError("admin.payments_profiles_load_failed", learnersResult.error)
       loadWarning = loadWarning
         ? `${loadWarning} The learner list could not be loaded.`
         : "The learner list could not be loaded, so new requests cannot be linked to a learner."

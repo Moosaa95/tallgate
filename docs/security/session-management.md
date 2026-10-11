@@ -22,11 +22,15 @@ directly. This means an XSS bug could read the session token.
 
 Compensating controls in place:
 
-- The Content Security Policy is enforced in production and now gates scripts
-  with a per-request nonce plus `'strict-dynamic'` (F-07), so injected inline
-  scripts do not execute.
-- No inline `<script>`, `next/script`, `dangerouslySetInnerHTML`, or JSON-LD is
-  used in the application, removing the common nonce-bypass surfaces.
+- The Content Security Policy is enforced in production, but `script-src` still
+  allows `'unsafe-inline'` (F-07, `PARTIAL`). A strict `script-src` is not
+  currently achievable: nonces require full dynamic rendering, and
+  `experimental.sri` only stamps `integrity` on external bundles while every
+  streamed page still emits inline `self.__next_f.push` scripts (upstream
+  vercel/next.js#95353 / #95354). **CSP therefore does not block injected inline
+  scripts today**, so it is not a mitigation for the readable-token risk.
+- The XSS surface is kept small: no inline `<script>`, `next/script`,
+  `dangerouslySetInnerHTML`, or JSON-LD is used in the application.
 - Server-side authorization re-checks the user on every protected request
   (`proxy.ts` session refresh + per-route Supabase calls); a stolen token still
   cannot exceed that user's RLS-scoped access.

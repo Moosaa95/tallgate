@@ -14,6 +14,7 @@ import {
   rateLimitUnavailableResponse,
   RateLimitUnavailableError,
 } from "@/lib/api/rateLimit"
+import { logError } from "@/lib/logging/logger"
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     ])
 
     if (dbError) {
-      console.error("Contact database insert failed:", dbError)
+      logError("contact.insert_failed", dbError)
       return NextResponse.json(
         { error: "Message could not be saved. Please try again." },
         { status: 503 }
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof RateLimitUnavailableError) {
       return rateLimitUnavailableResponse()
     }
-    console.error("Contact API error:", error)
+    logError("contact.request_failed", error)
     return NextResponse.json(
       { error: "Internal server error." },
       { status: 500 }

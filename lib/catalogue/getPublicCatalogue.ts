@@ -9,6 +9,7 @@ import {
   type PublicCatalogueResult,
   type PublicCourseResult,
 } from "@/lib/catalogue/publicCatalogue"
+import { logError } from "@/lib/logging/logger"
 
 /**
  * Server-side reads of the published Learning Hub catalogue.
@@ -33,7 +34,7 @@ async function loadPublishedCatalogue(): Promise<PublicCatalogueResult> {
     .order("display_order", { ascending: true })
 
   if (courseError) {
-    console.error("Unable to load published courses:", courseError)
+    logError("catalogue.published_courses_failed", courseError)
     return { status: "unavailable", message: CATALOGUE_UNAVAILABLE_MESSAGE }
   }
 
@@ -51,7 +52,7 @@ async function loadPublishedCatalogue(): Promise<PublicCatalogueResult> {
     .order("order_index", { ascending: true })
 
   if (moduleError) {
-    console.error("Unable to load course modules:", moduleError)
+    logError("catalogue.course_modules_failed", moduleError)
     return { status: "unavailable", message: CATALOGUE_UNAVAILABLE_MESSAGE }
   }
 
@@ -77,7 +78,7 @@ async function loadLessons(moduleIds: string[]) {
     .order("order_index", { ascending: true })
 
   if (error) {
-    console.error("Unable to load course lessons:", error)
+    logError("catalogue.course_lessons_failed", error)
     return null
   }
 
@@ -101,7 +102,7 @@ async function loadPublishedCourse(slug: string): Promise<PublicCourseResult> {
     .maybeSingle()
 
   if (courseError) {
-    console.error("Unable to load course:", courseError)
+    logError("catalogue.course_failed", courseError, { slug })
     return { status: "unavailable", message: CATALOGUE_UNAVAILABLE_MESSAGE }
   }
 
@@ -116,7 +117,7 @@ async function loadPublishedCourse(slug: string): Promise<PublicCourseResult> {
     .order("order_index", { ascending: true })
 
   if (moduleError) {
-    console.error("Unable to load course modules:", moduleError)
+    logError("catalogue.course_modules_failed", moduleError, { slug })
     return { status: "unavailable", message: CATALOGUE_UNAVAILABLE_MESSAGE }
   }
 

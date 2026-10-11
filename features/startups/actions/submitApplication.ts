@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/database/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/auth/requireUser";
+import { logError } from "@/lib/logging/logger";
 
 export interface ApplicationState {
   status: "idle" | "success" | "error";
@@ -54,7 +55,7 @@ export async function submitStartupApplication(
   try {
     admin = createAdminClient();
   } catch (error) {
-    console.error("Startup application admin client unavailable:", error);
+    logError("startup_submission.admin_client_unavailable", error);
     return {
       status: "error",
       message: "Something went wrong submitting your application. Please try again.",
@@ -75,7 +76,7 @@ export async function submitStartupApplication(
   });
 
   if (error) {
-    console.error("Startup application submission failed:", error);
+    logError("startup_submission.insert_failed", error);
     return {
       status: "error",
       message: "Something went wrong submitting your application. Please try again.",

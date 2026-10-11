@@ -1,5 +1,6 @@
 import CourseContentAdminClient from "@/components/admin/CourseContentAdminClient"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
+import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
   title: "Course Materials & Live Classes | TallGate Admin",
@@ -56,7 +57,7 @@ export default async function AdminCourseContentPage({
     ["lesson content", contentResult.error],
     ["live sessions", sessionsResult.error],
   ] as const) {
-    if (error) console.error(`Course content admin page could not load ${name}:`, error)
+    if (error) logError("admin.course_content_load_failed", error, { resource: name })
   }
 
   const moduleCourses = new Map((modulesResult.data ?? []).map((module) => [module.id, module.course_id]))

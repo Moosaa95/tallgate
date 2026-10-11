@@ -2,6 +2,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { toCertificate, type AdminCertificate } from "@/lib/data/adminRowMappers"
 import { ADMIN_QUERY_LIMIT } from "@/lib/admin/queryLimits"
 import CertificatesClient from "@/components/admin/CertificatesClient"
+import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
   title: "Certificate Registry & Credential Issuance | TallGate Admin",
@@ -38,7 +39,7 @@ export default async function AdminCertificatesPage({
 
       if (certificatesResult.error) {
         loadFailed = true
-        console.error("Unable to load certificate registry:", certificatesResult.error)
+        logError("admin.certificate_registry_load_failed", certificatesResult.error)
         dataWarning =
           "Certificate records could not be loaded from Supabase. The list below may be incomplete."
       } else {
@@ -49,7 +50,7 @@ export default async function AdminCertificatesPage({
       }
 
       if (learnerRoleResult.error) {
-        console.error("Unable to find the learner role for certificate issuance:", learnerRoleResult.error)
+        logError("admin.learner_role_lookup_failed", learnerRoleResult.error)
         dataWarning = `${dataWarning ? `${dataWarning} ` : ""}Learner accounts could not be loaded.`
       } else if (learnerRoleResult.data) {
         const { data: assignments, error: assignmentsError } = await supabase
@@ -58,7 +59,7 @@ export default async function AdminCertificatesPage({
           .eq("role_id", learnerRoleResult.data.id)
 
         if (assignmentsError) {
-          console.error("Unable to load learner role assignments:", assignmentsError)
+          logError("admin.learner_role_assignments_load_failed", assignmentsError)
           dataWarning = `${dataWarning ? `${dataWarning} ` : ""}Learner accounts could not be loaded.`
         } else if (assignments?.length) {
           const { data: profiles, error: profilesError } = await supabase
@@ -68,7 +69,7 @@ export default async function AdminCertificatesPage({
             .order("full_name")
 
           if (profilesError) {
-            console.error("Unable to load learner profiles:", profilesError)
+            logError("admin.learner_profiles_load_failed", profilesError)
             dataWarning = `${dataWarning ? `${dataWarning} ` : ""}Learner accounts could not be loaded.`
           } else {
             learners = profiles ?? []
@@ -77,7 +78,7 @@ export default async function AdminCertificatesPage({
       }
     } catch (error) {
       loadFailed = true
-      console.error("Unable to load certificate registry:", error)
+      logError("admin.certificate_registry_load_failed", error)
       dataWarning =
         "Certificate records could not be loaded from Supabase. The list below may be incomplete."
     }

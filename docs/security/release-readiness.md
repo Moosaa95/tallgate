@@ -1,14 +1,14 @@
 # Release Readiness — TallGate
 
 - **Scope:** Go/no-go summary based on the ASVS 5.0.0 assessment (`docs/security/asvs-5.0.0-assessment.md`) and the external-configuration verification (`docs/security/external-configuration-verification.md`).
-- **Repository state referenced:** `main` through the Batch 8 documentation commits (`aafaca6`..`eaa5243`, see `git log`). Working tree clean, 17 commits ahead of `origin/main` before this batch.
+- **Repository state referenced:** `main` @ `253c478` (prior batches pushed to `origin/main`), plus the current in-repo hardening pass (startup secret fail-fast, audit-log retention, session documentation). See `git log`.
 - **Nature of this document:** an in-repo review with **limited read-only live checks** (2026-10-11). It is **not** a penetration test and does not certify a deployed instance.
 
 ## Automated gates (re-run 2026-10-11)
 
 | Check | Command | Result |
 | ----- | ------- | ------ |
-| Unit tests | `npm run test` | PASS — 118 passing / 16 files |
+| Unit tests | `npm run test` | PASS — 123 passing / 17 files |
 | Types | `npm run typecheck` | PASS (clean) |
 | Lint | `npm run lint` | PASS — 0 errors, 19 warnings (pre-existing) |
 | Production build | `npm run build` | PASS |
@@ -27,9 +27,11 @@ CI (`.github/workflows/ci.yml`) runs the build/test/lint/typecheck gates on Node
 | Auth callback (email `token_hash` + PKCE) & safe redirects | PASS | F-11, `tests/unit/auth-callback.test.ts` | — |
 | Rate limiting (fail-closed) | PASS | F-09, `tests/unit/rate-limit.test.ts` | Needs X-08 (proxy headers) |
 | Security headers | PASS | F-06, `tests/unit/security-headers.test.ts` | — |
-| CSP | PARTIAL | F-07 | `'unsafe-inline'` scripts remain (no nonce) |
+| CSP | PARTIAL | F-07 | `'unsafe-inline'` scripts remain; nonce CSP reverted (breaks static pages) |
+| Startup secret validation | PASS | F-29, `instrumentation.ts`, `tests/unit/env.test.ts` | — |
+| Session cookie / lifetime (documented) | PARTIAL | F-13, F-14, `docs/security/session-management.md` | `httpOnly` false (accepted); dashboard values unverified |
 | Authorization / RLS | PASS | F-15 + live checks (X-06) | Deployed migration gap (below) |
-| Admin audit log | PARTIAL | F-27 | Migration not applied in the deployment; no retention/structured logging |
+| Admin audit log | PARTIAL | F-27 | Retention routine + structured audit logging added; migrations not applied in the deployment |
 | Payment → enrollment | PASS | F-24, `20261010000000_payment_confirmation_enrollment.sql` | Apply migration on deploy |
 | Public catalogue from Supabase | PASS | `lib/catalogue/*` | Public read verified live (X-06) |
 | External config (auth, TLS, secrets) | PARTIAL | X-01..X-11 | Several items `NOT VERIFIED` |
@@ -38,22 +40,22 @@ CI (`.github/workflows/ci.yml`) runs the build/test/lint/typecheck gates on Node
 
 ## Critical / high-priority blockers
 
-1. **Deployed schema is behind `main` (HIGH, X-11 `FAIL`).** `public.admin_audit_log` is absent in the linked project (`404 PGRST205` for both the publishable and secret keys); `20261011000000_admin_audit_log.sql` is not applied. The audit feature silently records nothing there. Safe apply/verify plan: `docs/security/migration-deployment-plan.md`.
+1. **Deployed schema is behind `main` (HIGH, X-11 `FAIL`).** `public.admin_audit_log` is absent in the linked project (`404 PGRST205` for both the publishable and secret keys); `20261011000000_admin_audit_log.sql` (and the new retention routine `20261011000001_admin_audit_log_retention.sql`) are not applied. The audit feature silently records nothing there. Safe apply/verify plan: `docs/security/migration-deployment-plan.md`.
 2. **X-01 redirect allow-list `NOT VERIFIED` (HIGH).** Dashboard-only; governs email-link `redirect_to`.
 3. **X-09 production secrets `NOT VERIFIED` (HIGH).** Local `.env.local` is fully configured, but the production/CI runtime was not inspected.
 4. **X-05 email templates `NOT VERIFIED` + F-31 (MEDIUM).** Cross-device template unconfirmed; live project auto-confirms emails.
 5. **X-08 proxy header override `NOT VERIFIED` (MEDIUM).** Without it, rate-limit IPs are spoofable.
 6. **X-07 app-host TLS `NOT VERIFIED` (MEDIUM).** The Supabase dependency is TLS 1.3; the app's own origin is unknown (site URL is `localhost`).
-7. **F-07 / F-27 residuals (LOW–MEDIUM).** CSP `'unsafe-inline'` scripts; no structured logging or audit retention.
+7. **F-07 / F-13 residuals (LOW–MEDIUM).** CSP `'unsafe-inline'` scripts remain (nonce CSP requires full dynamic rendering or SRI); session cookie `httpOnly` is false (accepted/documented). F-27 structured audit logging and retention are now in-repo but require the migration to be applied.
 
 ## Pre-release checklist
 
-1. Apply `20261011000000_admin_audit_log.sql` per `docs/security/migration-deployment-plan.md` and verify admins-only SELECT plus effective RLS after the change.
+1. Apply `20261011000000_admin_audit_log.sql` and `20261011000001_admin_audit_log_retention.sql` per `docs/security/migration-deployment-plan.md`, then verify admins-only SELECT plus effective RLS and the retention function grants.
 2. Verify X-01 (redirect allow-list), X-05 (email templates) and X-09 (production secrets) with evidence.
 3. Confirm X-08 (edge overwrites trusted client-IP headers).
 4. Run a TLS scan against the production origin (X-07).
-5. Decide/document email verification (F-31) and session lifetime/`httpOnly` (F-13/F-14).
-6. Schedule nonce-based CSP (F-07) and audit-log retention (F-27).
+5. Confirm the hosted session lifetime/refresh values and document them (F-13/F-14).
+6. Schedule the strict CSP work (F-07: full-dynamic rendering or hash-based SRI) and broader structured logging (F-27).
 
 ## Recommendation
 

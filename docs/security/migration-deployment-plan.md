@@ -78,3 +78,27 @@ The following were **not** available, which is why the plan was not executed and
 - No dashboard/management-API access.
 
 **Owner action required:** run the preconditions and apply step above with authorization, then complete the verification section and record the result here (and in `external-configuration-verification.md`, X-06/X-11).
+
+## Retention migration and scheduling (`20261011000001_admin_audit_log_retention.sql`)
+
+Additive companion migration that adds `public.purge_admin_audit_log(p_retain_days integer default 365)`:
+
+- **Idempotent:** `create or replace function`, plus `revoke`/`grant`. Safe to re-run.
+- **Privileges:** `SECURITY DEFINER` with `set search_path = ''`; execute revoked from `public`, `anon`, `authenticated` and granted only to `service_role`. `anon`/`authenticated` cannot purge.
+- **Effect:** deletes `admin_audit_log` rows older than the retention window and returns the deleted count. Non-positive `p_retain_days` raises an error. Additive only — it does not alter the table.
+- **Apply:** same process/verification as above (`supabase db push`, or paste verbatim in the SQL editor). Verify with `select public.purge_admin_audit_log(365);` under an authorized role.
+
+### Scheduling (pg_cron) — optional, dashboard/extensions required
+
+The retention function does nothing until invoked. To run it nightly, enable the `pg_cron` extension (Dashboard → Database → Extensions) and schedule, e.g.:
+
+```sql
+select cron.schedule(
+  'purge-admin-audit-log',
+  '0 3 * * *',
+  $$select public.purge_admin_audit_log(365);$$
+);
+```
+
+Alternatively call it from an external scheduler via the service role. This requires dashboard access that is **NOT VERIFIED** in this environment; record the chosen jobs and retention window here once configured.
+

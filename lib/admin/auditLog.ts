@@ -53,9 +53,9 @@ export async function recordAdminAudit(entry: AdminAuditEntry): Promise<void> {
     })
 
     if (error) {
-      console.error("Admin audit log write failed:", error.code)
+      console.error("[admin-audit] insert failed", { code: error.code })
     }
   } catch {
-    console.error("Admin audit log write failed: admin client unavailable.")
+    console.error("[admin-audit] admin client unavailable")
   }
 }

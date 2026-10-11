@@ -12,9 +12,9 @@
 
 | Status | Count |
 | ------ | ----- |
-| PASS | 14 |
+| PASS | 16 |
 | FAIL | 0 |
-| PARTIAL | 13 |
+| PARTIAL | 11 |
 | NOT VERIFIED | 1 |
 | N/A | 3 |
 
@@ -30,14 +30,14 @@ The four findings originally marked `FAIL` have been remediated in isolated sub-
 | F-04 | V6.2.1 | Password policy consistency: registration and reset share one rule (≥8, ≤128) | PASS | `lib/auth/registration.ts:8-28` (`PASSWORD_MIN_LENGTH`/`PASSWORD_MAX_LENGTH`); `app/(auth)/register/page.tsx`, `app/(auth)/reset-password/page.tsx`; tests `tests/unit/registration.test.ts` | None |
 | F-05 | V2.1 | Input-validation rules are implemented in code but not documented | PARTIAL | Validators exist (`lib/api/request.ts`); no validation-rule documentation located | Document per-endpoint validation rules |
 | F-06 | V3.2, V3.3 | Security response headers (HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors`) | PASS | `next.config.mjs:9-21` | None |
-| F-07 | V3.4 | CSP is now **enforced** in production (report-only in dev). `default-src`, `object-src`, `frame-ancestors`, `base-uri`, `form-action` and `img-src` are locked down; `script-src`/`style-src` still allow `'unsafe-inline'` (Next.js inline hydration scripts and inline style attributes) with no nonce/hash | PARTIAL | `next.config.mjs:1-66`; tests `tests/unit/security-headers.test.ts` (4 passing) | Thread a per-request nonce through rendered pages and drop `'unsafe-inline'` from `script-src` |
+| F-07 | V3.4 | CSP is **enforced** in production (report-only in dev). `default-src`, `object-src`, `frame-ancestors`, `base-uri`, `form-action` and `img-src` are locked down; `script-src`/`style-src` still allow `'unsafe-inline'` (Next.js inline hydration scripts and inline style attributes). A nonce-based `script-src 'nonce-…' 'strict-dynamic'` policy was implemented and runtime-tested, then **deliberately reverted**: Next.js only stamps nonces on dynamically rendered pages, so it blocked every script on the statically rendered marketing/landing pages (verified 2026-10-11: `/events` 17/17 scripts nonce'd, `/login` 0/16). Adopting nonces requires making the whole app dynamic (losing static/CDN caching) or enabling the experimental hash-based (SRI) CSP | PARTIAL | `next.config.mjs:1-66`; tests `tests/unit/security-headers.test.ts` (4 passing); runtime nonce check 2026-10-11 | Keep the enforced CSP; drop `'unsafe-inline'` only via full dynamic rendering or hash-based (SRI) CSP |
 | F-08 | V4.1 | API responses set correct `Content-Type`; request bodies validated; errors are generic (no stack traces leaked) | PASS | `lib/api/request.ts:20-25`; generic error helper `app/api/admin/actions/route.ts:33` | None |
 | F-09 | V6.1, V6.3 | Rate limiting present on public/abusive endpoints and now **fails closed** when identity cannot be resolved | PASS | `lib/api/rateLimit.ts:55-99`; tests `tests/unit/rate-limit.test.ts` (5 passing) | Document expected proxy header configuration operationally |
 | F-10 | V6.1 | Client-IP trust for rate limiting relies on proxy-set headers `x-real-ip`/`cf-connecting-ip` (overridable via `RATE_LIMIT_TRUSTED_IP_HEADERS`) | PARTIAL | `lib/api/rateLimit.ts:21-53` | Ensure the edge proxy strips/overwrites these headers; otherwise they are spoofable |
 | F-11 | V6, V10 | Auth callback handles email `token_hash` + `type` (`verifyOtp`) and PKCE `code` (`exchangeCodeForSession`), with safe-redirect validation and fail-closed error path | PASS | `app/auth/callback/route.ts:15-43`, `lib/auth/redirect.ts:1-21`; tests `tests/unit/auth-callback.test.ts` (16 passing), `tests/unit/redirect.test.ts` | None |
 | F-12 | V6, V10 | Callback redirect on failure uses `?error=auth`, but the login page does not render it (dead parameter, no user-visible feedback) | PARTIAL | `app/auth/callback/route.ts:42`; `app/(auth)/login/page.tsx` reads `next` but not `error` | Either render the error on `/login` or drop the unused parameter |
-| F-13 | V7.1 | Session cookies: `SameSite=Lax`, `Secure` in production, `path=/`; **`httpOnly` is false** (Supabase SSR default) so session tokens are readable by JavaScript | PARTIAL | `lib/supabase/cookieOptions.ts:1-5`; `node_modules/@supabase/ssr/dist/module/utils/constants.js:4` | Accept and document, or adopt a server-only session pattern; the now-enforced CSP (F-07) reduces, but does not remove, the XSS impact |
-| F-14 | V7.1 | Documented session inactivity/absolute lifetime | PARTIAL | None located | Document session lifetime and re-authentication expectations |
+| F-13 | V7.1 | Session cookies: `SameSite=Lax`, `Secure` in production, `path=/`; **`httpOnly` is false** (Supabase SSR default) so session tokens are readable by JavaScript. The trade-off, compensating controls, and revisit criteria are now documented | PARTIAL | `lib/supabase/cookieOptions.ts:1-5`; `docs/security/session-management.md`; `node_modules/@supabase/ssr/dist/module/utils/constants.js:4` | Accepted and documented; revisit only by adopting a server-only session pattern |
+| F-14 | V7.1 | Session inactivity/absolute lifetime and re-authentication expectations are documented; the hosted Supabase project manages the values (dashboard-verified values still required) | PASS | `docs/security/session-management.md`; `lib/supabase/middleware.ts:56-68` | None (confirm dashboard values at deploy) |
 | F-15 | V8.1, V8.2 | Function-level and data-level authorization: proxy gating on protected prefixes using `getUser()`, `requireAdmin()` guards, RLS enabled on **21** tables with **62** policies, single-role-per-user, admin RPCs `SECURITY DEFINER` + `is_admin()` | PASS | Source: `proxy.ts:4-11`, `lib/supabase/middleware.ts:20-71`; 21 × `ENABLE ROW LEVEL SECURITY`, 62 × `CREATE POLICY`, 9 × `SECURITY DEFINER`. Live (2026-10-11, publishable key vs secret key): `profiles`/`user_roles` return 0 rows to anon but exist (count 2) for the service role; `payment_requests`/`certificates`/`live_sessions`/`api_rate_limits` return `42501 permission denied`; private `certificates` bucket lists no objects to anon (X-06) | Deployed schema is one migration behind `main` (X-11); the unapplied migration only adds the audit table |
 | F-16 | V8.1 | No super-admin: any admin can change another admin's role (self-change blocked) | PARTIAL | `app/api/admin/actions/route.ts` (`update_user_role`; `assignUserRole`) | Add a protected owner role or document the accepted risk |
 | F-17 | V9.1 | Self-contained token validation delegated to Supabase Auth (JWT signature verification) | NOT VERIFIED | No custom token handling; verification performed inside `@supabase/*` | Verify Supabase JWT verification settings; no app-level claim to make |
@@ -50,9 +50,9 @@ The four findings originally marked `FAIL` have been remediated in isolated sub-
 | F-24 | V14.1, V14.2 | Data protection: no payment-card data stored (`payment_requests` records status only); RLS on user data; private storage buckets; secrets never exposed via `NEXT_PUBLIC_*` | PASS | `supabase/migrations/20261007130000_payment_requests.sql`; `lib/supabase/admin.ts`; env naming | None |
 | F-25 | V15.1 | Dependency management: production dependencies have **0** known vulnerabilities | PASS | `npm audit --omit=dev` → `found 0 vulnerabilities` | None |
 | F-26 | V15.1 | Build-time/dev dependencies carry advisories (7 high, 2 moderate) in the Tailwind/PostCSS/eslint chain | PARTIAL | `npm audit` → 9 advisories, fixes require breaking major upgrades | Schedule dependency upgrades; not shipped to the runtime bundle |
-| F-27 | V16.1, V16.2 | Admin actions now write a durable audit record (actor, action, target, outcome) via the service role, readable by admins only; app-wide structured logging and log retention are still absent and `console.*` remains in use | PARTIAL | `supabase/migrations/20261011000000_admin_audit_log.sql`, `lib/admin/auditLog.ts`, `app/api/admin/actions/route.ts:211-252`; tests `tests/unit/admin-audit-log.test.ts` (10 passing) | Add structured, PII-scrubbed logging and a retention policy for `admin_audit_log` |
+| F-27 | V16.1, V16.2 | Admin actions write a durable audit record (actor, action, target, outcome) via the service role, readable by admins only; audit-write failures now emit a structured, value-free `[admin-audit]` log line; a `purge_admin_audit_log(days)` retention routine (SECURITY DEFINER, `service_role` only) is added but **unapplied**. App-wide structured logging is still absent | PARTIAL | `supabase/migrations/20261011000000_admin_audit_log.sql`, `supabase/migrations/20261011000001_admin_audit_log_retention.sql`, `lib/admin/auditLog.ts`; tests `tests/unit/admin-audit-log.test.ts` (10 passing) | Apply both migrations; adopt structured logging more broadly |
 | F-28 | V16.3, V16.4 | Error handling: generic client-facing errors and error boundaries | PASS | `app/error.tsx`, `app/not-found.tsx` | None |
-| F-29 | V13.2, V14.2 | Production startup only warns on missing critical secrets rather than failing fast | PARTIAL | `next.config.mjs:76-92` | Fail build/start (or health check) when required secrets are absent |
+| F-29 | V13.2, V14.2 | The server now **fails fast** at startup in production when a critical secret is absent, via `instrumentation.ts` → `assertCriticalEnv()` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL`); skipped during `next build` so secret-less CI builds still succeed | PASS | `instrumentation.ts`, `lib/config/env.ts`; tests `tests/unit/env.test.ts` (5 passing) | None |
 | F-30 | V17.1 | WebRTC | N/A | No WebRTC usage in the codebase | None |
 | F-31 | V6.2, V6.3 | Email-address verification: the live project has `mailer_autoconfirm: true`, so new accounts are **not** required to confirm their email; the app nonetheless routes sign-ups to `/verify-email` | PARTIAL | Live 2026-10-11: `/auth/v1/settings` → `mailer_autoconfirm: true`, `disable_signup: false`; `app/(auth)/register/page.tsx`; X-05 | Enable email confirmation, or accept and document the risk; then confirm the cross-device template |
 
@@ -60,7 +60,7 @@ The four findings originally marked `FAIL` have been remediated in isolated sub-
 
 Commands executed for this assessment:
 
-- `npm run test` — **118 passing** across 16 files, including `tests/unit/auth-callback.test.ts` (16 cases), `tests/unit/rate-limit.test.ts` (5 cases), `tests/unit/registration.test.ts` (7 cases), `tests/unit/admin-audit-log.test.ts` (10 cases) and `tests/unit/security-headers.test.ts` (4 cases).
+- `npm run test` — **123 passing** across 17 files, including `tests/unit/auth-callback.test.ts` (16 cases), `tests/unit/rate-limit.test.ts` (5 cases), `tests/unit/registration.test.ts` (7 cases), `tests/unit/admin-audit-log.test.ts` (10 cases), `tests/unit/security-headers.test.ts` (4 cases) and `tests/unit/env.test.ts` (5 cases).
 - `npm run typecheck` — clean (`tsc --noEmit`).
 - `npm run lint` — 0 errors (pre-existing warnings only).
 - `npm run build` — succeeds.
@@ -103,12 +103,11 @@ Each remediation was delivered as an isolated commit with its own regression tes
 
 ## Remaining gaps (prioritized)
 
-1. **Apply the pending migration** `20261011000000_admin_audit_log.sql` (X-11 `FAIL`; safe plan in `docs/security/migration-deployment-plan.md`) and re-verify the audit-log read policy.
+1. **Apply the pending migrations** `20261011000000_admin_audit_log.sql` and `20261011000001_admin_audit_log_retention.sql` (X-11 `FAIL`; safe plan in `docs/security/migration-deployment-plan.md`) and re-verify the audit-log read policy.
 2. **X-01 / X-09** Verify the Supabase redirect allow-list and the production runtime secrets (dashboard + hosting).
 3. **F-31** Decide on email verification: live `mailer_autoconfirm` is `true` (addresses not confirmed).
-4. **F-07** Thread a nonce through rendered pages and drop `'unsafe-inline'` from `script-src` (CSP is now enforced in production).
-5. **F-27** Add structured, PII-scrubbed logging and a retention policy for `admin_audit_log`.
-6. **F-13, F-14** Document the session-cookie `httpOnly` trade-off and session lifetime.
+4. **F-07** Drop `'unsafe-inline'` from `script-src` via full dynamic rendering or hash-based (SRI) CSP (a nonce policy was tested and reverted because it breaks statically rendered pages).
+5. **F-13 / F-14** Confirm the hosted Supabase session lifetime/refresh values against `docs/security/session-management.md`.
+6. **F-27** Apply the retention migration and adopt structured logging more broadly.
 7. **F-10 / X-08** Confirm the edge proxy overwrites (not appends) the trusted client-IP headers.
-8. **F-29** Fail fast on missing critical secrets instead of logging a startup warning.
-9. **F-26** Schedule upgrades for dev/build dependency advisories.
+8. **F-26** Schedule upgrades for dev/build dependency advisories.

@@ -1,7 +1,7 @@
 # Release Readiness — TallGate
 
 - **Scope:** Go/no-go summary based on the ASVS 5.0.0 assessment (`docs/security/asvs-5.0.0-assessment.md`) and the external-configuration verification (`docs/security/external-configuration-verification.md`).
-- **Repository state referenced:** `main` through commit `aafaca6`, plus the Batch 8 documentation commit (see `git log`). Working tree clean, 14 commits ahead of `origin/main` before this batch.
+- **Repository state referenced:** `main` through the Batch 8 documentation commits (`aafaca6`..`eaa5243`, see `git log`). Working tree clean, 17 commits ahead of `origin/main` before this batch.
 - **Nature of this document:** an in-repo review with **limited read-only live checks** (2026-10-11). It is **not** a penetration test and does not certify a deployed instance.
 
 ## Automated gates (re-run 2026-10-11)
@@ -32,8 +32,8 @@ CI (`.github/workflows/ci.yml`) runs the build/test/lint/typecheck gates on Node
 | Admin audit log | PARTIAL | F-27 | Migration not applied in the deployment; no retention/structured logging |
 | Payment → enrollment | PASS | F-24, `20261010000000_payment_confirmation_enrollment.sql` | Apply migration on deploy |
 | Public catalogue from Supabase | PASS | `lib/catalogue/*` | Public read verified live (X-06) |
-| External config (auth, TLS, secrets) | PARTIAL | X-01..X-10 | Several items `NOT VERIFIED` |
-| Deployed schema vs `main` | FAIL | X-06 | Deployment is one migration behind |
+| External config (auth, TLS, secrets) | PARTIAL | X-01..X-11 | Several items `NOT VERIFIED` |
+| Deployed schema vs `main` | FAIL | X-11 | Deployment is one migration behind |
 | Email verification | PARTIAL | F-31 | Live `mailer_autoconfirm: true` — emails not verified |
 
 ## Critical / high-priority blockers

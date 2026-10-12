@@ -20,6 +20,7 @@ import {
   HiOutlineXMark,
   HiOutlineUsers,
   HiOutlineBanknotes,
+  HiOutlineClipboardDocumentCheck,
 } from "react-icons/hi2"
 
 interface NavItem {
@@ -52,6 +53,7 @@ const navGroups: NavGroup[] = [
       { name: "Materials & Live Classes", href: "/admin/course-content", icon: HiOutlineDocumentText },
       { name: "Student Enrollments", href: "/admin/enrollments", icon: HiOutlineUserGroup },
       { name: "Payment Requests", href: "/admin/payments", icon: HiOutlineBanknotes },
+      { name: "Attempt Grading", href: "/admin/grading", icon: HiOutlineClipboardDocumentCheck },
       { name: "Certificate Registry", href: "/admin/certificates", icon: HiOutlineIdentification },
     ],
   },

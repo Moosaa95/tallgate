@@ -11,6 +11,7 @@ export type RateLimitBucket =
   | "enrollment"
   | "email"
   | "verification"
+  | "assessment"
 
 export class RateLimitUnavailableError extends Error {
   constructor() {

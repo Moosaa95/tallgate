@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { randomBytes } from "crypto"
-import { readFile } from "fs/promises"
-import path from "path"
-import QRCode from "qrcode"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireAdminApi } from "@/lib/auth/guards"
 import { readJsonObject, isValidEmailAddress, isNonEmptyText, isOptionalText } from "@/lib/api/request"
-import { renderCertificatePdf } from "@/lib/certificates/generateCertificatePdf"
 import {
   CANONICAL_MODULE_TITLE,
   DEFAULT_COURSE_LEVEL,
@@ -16,6 +11,8 @@ import {
   toCourseInsert,
   type ExistingCatalogueCourse,
 } from "@/lib/admin/catalogueSeed"
+import { issueCourseCertificate, type IssueCertificateFailure } from "@/lib/certificates/issueCertificate"
+import { checkCourseCompletion } from "@/lib/assessments/completion"
 import { toCourse } from "@/lib/data/adminRowMappers"
 import { coursesData } from "@/lib/data/courses"
 import { paymentStatusError } from "@/lib/admin/paymentStatusErrors"
@@ -26,7 +23,7 @@ import {
 } from "@/lib/admin/auditLog"
 import type { Database } from "@/types/supabase"
 import { isNonEmptyString, isOneOf, isRecord } from "@/lib/utils"
-import { logError, logWarn } from "@/lib/logging/logger"
+import { logError } from "@/lib/logging/logger"
 
 export const runtime = "nodejs"
 
@@ -46,16 +43,11 @@ type AdminAuditContext = {
   target: string | null
 }
 
-const CERTIFICATE_BUCKET = "certificates"
-const CERTIFICATE_CONTENT_TYPE = "application/pdf"
-const CERTIFICATE_FILE_NAME = "certificate.pdf"
-
 type ConsultationUpdate = Database["public"]["Tables"]["consultation_requests"]["Update"]
 type StartupApplicationUpdate = Database["public"]["Tables"]["startup_applications"]["Update"]
 type CourseUpdate = Database["public"]["Tables"]["courses"]["Update"]
 type CertificateUpdate = Database["public"]["Tables"]["certificates"]["Update"]
 type ContactMessageUpdate = Database["public"]["Tables"]["contact_messages"]["Update"]
-type CertificateInsert = Database["public"]["Tables"]["certificates"]["Insert"]
 type PaymentInsert = Database["public"]["Tables"]["payment_requests"]["Insert"]
 type CourseInsert = Database["public"]["Tables"]["courses"]["Insert"]
 type CourseRow = Database["public"]["Tables"]["courses"]["Row"]
@@ -87,60 +79,6 @@ const PAYMENT_STATUSES: readonly PaymentStatus[] = ["pending", "confirmed", "dec
 const PAYMENT_METHODS: readonly PaymentMethod[] = ["bank_transfer", "card", "cash", "other"]
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-type CertificateRow = Database["public"]["Tables"]["certificates"]["Row"]
-
-type IssuedCertificate = Pick<
-  CertificateRow,
-  | "id"
-  | "certificate_number"
-  | "verification_code"
-  | "recipient_name"
-  | "user_id"
-  | "course_title"
-  | "issue_date"
-  | "grade"
-  | "is_valid"
-  | "created_at"
->
-
-async function loadCertificateLogo(): Promise<string | undefined> {
-  try {
-    const filePath = path.join(process.cwd(), "public", "assets", "tallgate-logo.png")
-    const buffer = await readFile(filePath)
-    return `data:image/png;base64,${buffer.toString("base64")}`
-  } catch (error) {
-    // Issuance still succeeds, but the PDF is produced without the brand logo.
-    // Logged as an error because this is a silent degradation of the output.
-    logWarn("admin_action.certificate_logo_unavailable", { error })
-    return undefined
-  }
-}
-
-function buildCertificateStoragePath() {
-  const token = randomBytes(24).toString("hex")
-  return `${token.slice(0, 2)}/${token.slice(2, 4)}/${token}.${CERTIFICATE_FILE_NAME.split(".").pop()}`
-}
-
-async function rollbackCertificate(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  certificateId: string
-) {
-  const { error } = await supabase.from("certificates").delete().eq("id", certificateId)
-  if (error) {
-    logError("admin_action.certificate_rollback_failed", error, { certificateId })
-  }
-}
-
-async function removeCertificateFile(
-  storageClient: ReturnType<typeof createAdminClient>,
-  storagePath: string
-) {
-  const { error } = await storageClient.storage.from(CERTIFICATE_BUCKET).remove([storagePath])
-  if (error) {
-    logError("admin_action.certificate_file_remove_failed", error, { storagePath })
-  }
-}
 
 type RoleAssignmentResult = { error: null; status?: undefined } | { error: string; status: 400 | 503 }
 
@@ -861,50 +799,6 @@ async function handleAdminAction(
           )
         }
 
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-        if (!siteUrl) {
-          return NextResponse.json(
-            { error: "Set NEXT_PUBLIC_SITE_URL before issuing certificates." },
-            { status: 503 }
-          )
-        }
-
-        let baseUrl: URL
-        try {
-          baseUrl = new URL(siteUrl)
-        } catch {
-          return NextResponse.json(
-            { error: "NEXT_PUBLIC_SITE_URL must be a valid absolute URL." },
-            { status: 500 }
-          )
-        }
-        const hostname = baseUrl.hostname.toLowerCase()
-        const isLocalHostname =
-          hostname === "localhost" ||
-          hostname.endsWith(".localhost") ||
-          hostname.endsWith(".local") ||
-          hostname.endsWith(".test") ||
-          hostname === "0.0.0.0" ||
-          /^127(?:\.\d{1,3}){3}$/.test(hostname) ||
-          hostname === "[::1]"
-        if (
-          baseUrl.protocol !== "https:" ||
-          isLocalHostname ||
-          baseUrl.username ||
-          baseUrl.password ||
-          baseUrl.pathname !== "/" ||
-          baseUrl.search ||
-          baseUrl.hash
-        ) {
-          return NextResponse.json(
-            {
-              error:
-                "NEXT_PUBLIC_SITE_URL must be a public HTTPS origin, not localhost or a development URL.",
-            },
-            { status: 503 }
-          )
-        }
-
         let issueDate = new Date().toISOString().slice(0, 10)
         if (issue_date !== undefined) {
           if (typeof issue_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(issue_date)) {
@@ -920,140 +814,41 @@ async function handleAdminAction(
           issueDate = issue_date
         }
 
-        for (const [field, value] of [["course_id", course_id]] as const) {
-          if (value !== undefined && value !== null && value !== "" &&
-              (typeof value !== "string" || !uuidPattern.test(value))) {
-            return NextResponse.json({ error: `${field} must be a valid UUID.` }, { status: 400 })
+        let courseId: string | null | undefined = undefined
+        if (course_id !== undefined && course_id !== null && course_id !== "") {
+          if (typeof course_id !== "string" || !uuidPattern.test(course_id)) {
+            return NextResponse.json({ error: `course_id must be a valid UUID.` }, { status: 400 })
           }
+          courseId = course_id
         }
 
-        const certificateInput: Omit<CertificateInsert, "verification_code"> = {
-          recipient_name: learnerProfile.full_name,
-          user_id,
-          course_title: course_title.trim(),
-          grade: typeof grade === "string" && grade.trim() ? grade.trim().slice(0, 100) : "Distinction",
-          issue_date: issueDate,
-          is_valid: true,
-          ...(typeof course_id === "string" && course_id ? { course_id } : {}),
-        }
+        const issueResult = await issueCourseCertificate({
+          userId: user_id,
+          courseId,
+          courseTitle: typeof course_title === "string" ? course_title : undefined,
+          grade: typeof grade === "string" ? grade : undefined,
+          issueDate,
+        })
 
-        let issuedCertificate: IssuedCertificate | null = null
-        let generatedCode = ""
-        let verificationUrlString = ""
-        let qrCode = ""
-        let insertError: { code?: string; message: string } | null = null
-
-        for (let attempt = 0; attempt < 3; attempt++) {
-          generatedCode = `TG-${new Date().getFullYear()}-${randomBytes(12)
-            .toString("hex")
-            .toUpperCase()}`
-          const verificationUrl = new URL("/verify", baseUrl)
-          verificationUrl.searchParams.set("code", generatedCode)
-          verificationUrlString = verificationUrl.toString()
-          qrCode = await QRCode.toDataURL(verificationUrlString, {
-            errorCorrectionLevel: "M",
-            margin: 1,
-            width: 320,
-          })
-
-          const { data, error } = await supabase
-            .from("certificates")
-            .insert({ ...certificateInput, verification_code: generatedCode })
-            .select(
-              "id, certificate_number, verification_code, user_id, recipient_name, course_title, issue_date, grade, is_valid, created_at"
-            )
-            .single()
-
-          if (!error) {
-            issuedCertificate = data
-            insertError = null
-            break
+        if (issueResult.status === "error") {
+          const statusByCode: Record<IssueCertificateFailure["code"], number> = {
+            site_url: 503,
+            not_found: 503,
+            unconfigured: 503,
+            insert: 503,
+            pdf: 503,
+            storage: 503,
+            persist: 503,
           }
-
-          insertError = error
-          if (error.code !== "23505") break
-        }
-
-        if (insertError || !issuedCertificate) {
-          logError("admin_action.certificate_issuance_failed", insertError)
-          return NextResponse.json(
-            { error: "Certificate could not be issued. Please try again." },
-            { status: 503 }
-          )
-        }
-
-        const storagePath = buildCertificateStoragePath()
-        let storageClient: ReturnType<typeof createAdminClient>
-        try {
-          storageClient = createAdminClient()
-        } catch (error) {
-          logError("admin_action.service_client_unavailable", error)
-          await rollbackCertificate(supabase, issuedCertificate.id)
-          return NextResponse.json(
-            { error: "Certificate could not be issued. Storage is not configured." },
-            { status: 503 }
-          )
-        }
-
-        let pdfBuffer: Buffer
-        try {
-          pdfBuffer = await renderCertificatePdf({
-            recipient_name: issuedCertificate.recipient_name,
-            course_title: issuedCertificate.course_title,
-            issue_date: issuedCertificate.issue_date,
-            grade: issuedCertificate.grade,
-            certificate_number: issuedCertificate.certificate_number,
-            verification_code: issuedCertificate.verification_code,
-            verification_url: verificationUrlString,
-            qr_data_url: qrCode,
-            logo_src: await loadCertificateLogo(),
-          })
-        } catch (error) {
-          logError("admin_action.certificate_pdf_generation_failed", error)
-          await rollbackCertificate(supabase, issuedCertificate.id)
-          return NextResponse.json(
-            { error: "Certificate could not be issued. PDF generation failed." },
-            { status: 503 }
-          )
-        }
-
-        const { error: uploadError } = await storageClient.storage
-          .from(CERTIFICATE_BUCKET)
-          .upload(storagePath, pdfBuffer, {
-            contentType: CERTIFICATE_CONTENT_TYPE,
-            upsert: false,
-          })
-
-        if (uploadError) {
-          logError("admin_action.certificate_pdf_upload_failed", uploadError)
-          await rollbackCertificate(supabase, issuedCertificate.id)
-          return NextResponse.json(
-            { error: "Certificate could not be issued. PDF upload failed." },
-            { status: 503 }
-          )
-        }
-
-        const { error: persistError } = await supabase
-          .from("certificates")
-          .update({ storage_path: storagePath })
-          .eq("id", issuedCertificate.id)
-
-        if (persistError) {
-          logError("admin_action.certificate_storage_path_persist_failed", persistError)
-          await removeCertificateFile(storageClient, storagePath)
-          await rollbackCertificate(supabase, issuedCertificate.id)
-          return NextResponse.json(
-            { error: "Certificate could not be issued. Please try again." },
-            { status: 503 }
-          )
+          return NextResponse.json({ error: issueResult.message }, { status: statusByCode[issueResult.code] })
         }
 
         return NextResponse.json({
           success: true,
-          certificate: { ...issuedCertificate, storage_path: storagePath },
-          verification_url: verificationUrlString,
-          qr_code: qrCode,
-          download_url: `/api/admin/certificates/${issuedCertificate.id}/download`,
+          certificate: issueResult.certificate,
+          verification_url: issueResult.verificationUrl,
+          qr_code: issueResult.qrCode,
+          download_url: issueResult.downloadUrl,
         })
       }
 
@@ -1088,6 +883,85 @@ async function handleAdminAction(
           )
         }
         return NextResponse.json({ success: true, message: "Certificate validity toggled" })
+      }
+
+      case "grade_attempt_answer": {
+        const { attempt_id, question_id, points, feedback } = payload
+
+        const gradeUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        if (!isNonEmptyString(attempt_id) || !gradeUuidPattern.test(attempt_id)) {
+          return NextResponse.json({ error: "A valid attempt id is required." }, { status: 400 })
+        }
+        if (!isNonEmptyString(question_id) || !gradeUuidPattern.test(question_id)) {
+          return NextResponse.json({ error: "A valid question id is required." }, { status: 400 })
+        }
+        if (typeof points !== "number" || !Number.isFinite(points) || points < 0) {
+          return NextResponse.json(
+            { error: "Points must be a non-negative number." },
+            { status: 400 }
+          )
+        }
+        if (feedback !== undefined && feedback !== null && !isOptionalText(feedback, 4000)) {
+          return NextResponse.json(
+            { error: "Feedback must be 4000 characters or fewer." },
+            { status: 400 }
+          )
+        }
+
+        const { data: attemptRow, error: attemptError } = await supabase
+          .from("quiz_attempts")
+          .select("id, user_id, status, quizzes(course_id)")
+          .eq("id", attempt_id)
+          .maybeSingle()
+
+        if (attemptError) {
+          return NextResponse.json(
+            { error: genericDbError("Attempt lookup failed:", attemptError) },
+            { status: 400 }
+          )
+        }
+        if (!attemptRow) {
+          return NextResponse.json({ error: "The attempt could not be found." }, { status: 404 })
+        }
+        if (attemptRow.status !== "pending_grading") {
+          return NextResponse.json(
+            { error: "Only attempts awaiting manual grading can be updated." },
+            { status: 409 }
+          )
+        }
+
+        const { data: gradeResult, error: gradeError } = await supabase.rpc("grade_attempt_answer", {
+          p_attempt_id: attempt_id,
+          p_question_id: question_id,
+          p_points: points,
+          p_feedback: typeof feedback === "string" ? feedback : null,
+        })
+
+        if (gradeError) {
+          logError("admin_action.grade_attempt_answer_failed", gradeError, {
+            attemptId: attempt_id,
+            questionId: question_id,
+          })
+          return NextResponse.json(
+            { error: "The answer could not be graded. Please try again." },
+            { status: 400 }
+          )
+        }
+
+        const courseId = attemptRow.quizzes?.course_id ?? null
+        let completion = null
+        if (courseId) {
+          try {
+            completion = await checkCourseCompletion(attemptRow.user_id, courseId)
+          } catch (completionError) {
+            logError("admin_action.grade_completion_failed", completionError, {
+              attemptId: attempt_id,
+              courseId,
+            })
+          }
+        }
+
+        return NextResponse.json({ success: true, result: gradeResult, completion })
       }
 
       case "update_message_status": {

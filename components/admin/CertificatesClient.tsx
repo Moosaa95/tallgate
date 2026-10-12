@@ -270,91 +270,90 @@ export default function CertificatesClient({
         {filteredCertificates.length > 0 ? (
           <>
             <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="px-6 py-4">Certificate Number</th>
-                  <th className="px-6 py-4">Verification Code</th>
-                  <th className="px-6 py-4">Recipient</th>
-                  <th className="px-6 py-4">Course Program</th>
-                  <th className="px-6 py-4">Issue Date</th>
-                  <th className="px-6 py-4">Grade</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Verification</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {pagedCertificates.map((cert) => (
-                  <tr key={cert.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-6 py-4">
-                      <span className="font-mono font-bold text-slate-800 bg-slate-50 px-2 py-1 rounded border border-slate-200 text-[11px]">
-                        {cert.certificate_number}
-                      </span>
-                    </td>
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="px-6 py-4">Certificate Number</th>
+                    <th className="px-6 py-4">Verification Code</th>
+                    <th className="px-6 py-4">Recipient</th>
+                    <th className="px-6 py-4">Course Program</th>
+                    <th className="px-6 py-4">Issue Date</th>
+                    <th className="px-6 py-4">Grade</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Verification</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pagedCertificates.map((cert) => (
+                    <tr key={cert.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className="font-mono font-bold text-slate-800 bg-slate-50 px-2 py-1 rounded border border-slate-200 text-[11px]">
+                          {cert.certificate_number}
+                        </span>
+                      </td>
 
-                    <td className="px-6 py-4">
-                      <span className="font-mono font-bold text-brand-primary bg-indigo-50 px-2 py-1 rounded border border-indigo-200 text-[11px]">
-                        {cert.verification_code}
-                      </span>
-                    </td>
+                      <td className="px-6 py-4">
+                        <span className="font-mono font-bold text-brand-primary bg-indigo-50 px-2 py-1 rounded border border-indigo-200 text-[11px]">
+                          {cert.verification_code}
+                        </span>
+                      </td>
 
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-slate-900 text-sm">{cert.recipient_name}</p>
-                    </td>
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-slate-900 text-sm">{cert.recipient_name}</p>
+                      </td>
 
-                    <td className="px-6 py-4">
-                      <span className="font-semibold text-slate-800">{cert.course_title}</span>
-                    </td>
+                      <td className="px-6 py-4">
+                        <span className="font-semibold text-slate-800">{cert.course_title}</span>
+                      </td>
 
-                    <td className="px-6 py-4 text-slate-500 text-[11px]">
-                      {formatCertificateIssueDate(cert.issue_date)}
-                    </td>
+                      <td className="px-6 py-4 text-slate-500 text-[11px]">
+                        {formatCertificateIssueDate(cert.issue_date)}
+                      </td>
 
-                    <td className="px-6 py-4">
-                      <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
-                        {cert.grade}
-                      </span>
-                    </td>
+                      <td className="px-6 py-4">
+                        <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                          {cert.grade}
+                        </span>
+                      </td>
 
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => toggleValidity(cert)}
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md transition-all ${
-                          cert.is_valid
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => toggleValidity(cert)}
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md transition-all ${cert.is_valid
                             ? "bg-emerald-100 text-emerald-800 border border-emerald-200 hover:bg-emerald-200"
                             : "bg-red-100 text-red-800 border border-red-200 hover:bg-red-200"
-                        }`}
-                      >
-                        {cert.is_valid ? "Valid" : "Revoked"}
-                      </button>
-                    </td>
-
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        {cert.storage_path && (
-                          <Link
-                            href={`/api/admin/certificates/${cert.id}/download`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-brand-primary hover:underline"
-                          >
-                            <HiOutlineArrowDownTray className="w-3.5 h-3.5" />
-                            <span>PDF</span>
-                          </Link>
-                        )}
-                        <Link
-                          href={`/admin/verify?code=${encodeURIComponent(cert.verification_code)}`}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-primary hover:underline"
+                            }`}
                         >
-                          <span>Verify Lookup</span>
-                          <HiOutlineArrowTopRightOnSquare className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          {cert.is_valid ? "Valid" : "Revoked"}
+                        </button>
+                      </td>
+
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          {cert.storage_path && (
+                            <Link
+                              href={`/api/admin/certificates/${cert.id}/download`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-brand-primary hover:underline"
+                            >
+                              <HiOutlineArrowDownTray className="w-3.5 h-3.5" />
+                              <span>PDF</span>
+                            </Link>
+                          )}
+                          <Link
+                            href={`/admin/verify?code=${encodeURIComponent(cert.verification_code)}`}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-brand-primary hover:underline"
+                          >
+                            <span>Verify Lookup</span>
+                            <HiOutlineArrowTopRightOnSquare className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
             <Pagination
               page={page}

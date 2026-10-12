@@ -18,6 +18,7 @@ export type Json =
  *   supabase/migrations/20261007120000_admin_course_lesson_writes.sql
  *   supabase/migrations/20261007130000_payment_requests.sql
  *   supabase/migrations/20261011000000_admin_audit_log.sql
+ *   supabase/migrations/20261012000000_assessments.sql
  *
  * Tables that exist only in earlier revisions (enrollments, categories) and
  * columns dropped by later migrations (lessons.content_markdown) have been
@@ -339,6 +340,7 @@ export interface Database {
           prerequisites: string | null
           is_popular: boolean
           is_published: boolean
+          auto_issue_certificate: boolean
           display_order: number
           created_at: string
         }
@@ -356,6 +358,7 @@ export interface Database {
           prerequisites?: string | null
           is_popular?: boolean
           is_published?: boolean
+          auto_issue_certificate?: boolean
           display_order?: number
           created_at?: string
         }
@@ -373,6 +376,7 @@ export interface Database {
           prerequisites?: string | null
           is_popular?: boolean
           is_published?: boolean
+          auto_issue_certificate?: boolean
           display_order?: number
           created_at?: string
         }
@@ -915,6 +919,398 @@ export interface Database {
         }
         Relationships: []
       }
+      questions: {
+        Row: {
+          id: string
+          course_id: string
+          module_id: string | null
+          type: 'single' | 'multiple' | 'true_false' | 'short' | 'essay'
+          prompt: string
+          explanation: string | null
+          points: number
+          is_published: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          course_id: string
+          module_id?: string | null
+          type: 'single' | 'multiple' | 'true_false' | 'short' | 'essay'
+          prompt: string
+          explanation?: string | null
+          points?: number
+          is_published?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          course_id?: string
+          module_id?: string | null
+          type?: 'single' | 'multiple' | 'true_false' | 'short' | 'essay'
+          prompt?: string
+          explanation?: string | null
+          points?: number
+          is_published?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "course_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      question_options: {
+        Row: {
+          id: string
+          question_id: string
+          label: string
+          display_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          question_id: string
+          label: string
+          display_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          question_id?: string
+          label?: string
+          display_order?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_options_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      question_answers: {
+        Row: {
+          question_id: string
+          correct_option_ids: string[]
+          accepted_answers: string[]
+          created_at: string
+        }
+        Insert: {
+          question_id: string
+          correct_option_ids?: string[]
+          accepted_answers?: string[]
+          created_at?: string
+        }
+        Update: {
+          question_id?: string
+          correct_option_ids?: string[]
+          accepted_answers?: string[]
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: true
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quizzes: {
+        Row: {
+          id: string
+          course_id: string
+          module_id: string | null
+          kind: 'quiz' | 'practice' | 'exam'
+          title: string
+          instructions: string | null
+          time_limit_minutes: number | null
+          pass_mark_percent: number
+          max_attempts: number | null
+          retake_cooldown_minutes: number | null
+          shuffle_questions: boolean
+          shuffle_options: boolean
+          feedback_mode: 'immediate' | 'after_submit'
+          question_count: number | null
+          is_required: boolean
+          is_published: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          course_id: string
+          module_id?: string | null
+          kind?: 'quiz' | 'practice' | 'exam'
+          title: string
+          instructions?: string | null
+          time_limit_minutes?: number | null
+          pass_mark_percent?: number
+          max_attempts?: number | null
+          retake_cooldown_minutes?: number | null
+          shuffle_questions?: boolean
+          shuffle_options?: boolean
+          feedback_mode?: 'immediate' | 'after_submit'
+          question_count?: number | null
+          is_required?: boolean
+          is_published?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          course_id?: string
+          module_id?: string | null
+          kind?: 'quiz' | 'practice' | 'exam'
+          title?: string
+          instructions?: string | null
+          time_limit_minutes?: number | null
+          pass_mark_percent?: number
+          max_attempts?: number | null
+          retake_cooldown_minutes?: number | null
+          shuffle_questions?: boolean
+          shuffle_options?: boolean
+          feedback_mode?: 'immediate' | 'after_submit'
+          question_count?: number | null
+          is_required?: boolean
+          is_published?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quizzes_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "course_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_questions: {
+        Row: {
+          quiz_id: string
+          question_id: string
+          display_order: number
+        }
+        Insert: {
+          quiz_id: string
+          question_id: string
+          display_order?: number
+        }
+        Update: {
+          quiz_id?: string
+          question_id?: string
+          display_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_questions_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_questions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_attempts: {
+        Row: {
+          id: string
+          user_id: string
+          quiz_id: string
+          attempt_no: number
+          started_at: string
+          expires_at: string | null
+          submitted_at: string | null
+          question_order: Json
+          score_points: number
+          max_points: number
+          percent: number | null
+          passed: boolean | null
+          status: 'in_progress' | 'submitted' | 'pending_grading' | 'graded'
+          tab_switch_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          quiz_id: string
+          attempt_no?: number
+          started_at?: string
+          expires_at?: string | null
+          submitted_at?: string | null
+          question_order?: Json
+          score_points?: number
+          max_points?: number
+          percent?: number | null
+          passed?: boolean | null
+          status?: 'in_progress' | 'submitted' | 'pending_grading' | 'graded'
+          tab_switch_count?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          quiz_id?: string
+          attempt_no?: number
+          started_at?: string
+          expires_at?: string | null
+          submitted_at?: string | null
+          question_order?: Json
+          score_points?: number
+          max_points?: number
+          percent?: number | null
+          passed?: boolean | null
+          status?: 'in_progress' | 'submitted' | 'pending_grading' | 'graded'
+          tab_switch_count?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_attempts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_attempts_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attempt_answers: {
+        Row: {
+          id: string
+          attempt_id: string
+          question_id: string
+          selected_option_ids: string[]
+          text_answer: string | null
+          is_correct: boolean | null
+          points_awarded: number
+          grader_feedback: string | null
+          graded_at: string | null
+          graded_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          attempt_id: string
+          question_id: string
+          selected_option_ids?: string[]
+          text_answer?: string | null
+          is_correct?: boolean | null
+          points_awarded?: number
+          grader_feedback?: string | null
+          graded_at?: string | null
+          graded_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          attempt_id?: string
+          question_id?: string
+          selected_option_ids?: string[]
+          text_answer?: string | null
+          is_correct?: boolean | null
+          points_awarded?: number
+          grader_feedback?: string | null
+          graded_at?: string | null
+          graded_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attempt_answers_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attempt_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attempt_answers_graded_by_fkey"
+            columns: ["graded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recall_progress: {
+        Row: {
+          user_id: string
+          question_id: string
+          box: number
+          next_review_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          question_id: string
+          box?: number
+          next_review_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          question_id?: string
+          box?: number
+          next_review_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recall_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recall_progress_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -922,6 +1318,12 @@ export interface Database {
     Functions: {
       is_admin: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_enrolled: {
+        Args: {
+          p_course_id: string
+        }
         Returns: boolean
       }
       consume_public_rate_limit: {
@@ -932,6 +1334,85 @@ export interface Database {
           p_window_seconds: number
         }
         Returns: boolean
+      }
+      start_quiz_attempt: {
+        Args: {
+          p_quiz_id: string
+        }
+        Returns: {
+          attemptId: string
+          resumed: boolean
+          startedAt: string | null
+          expiresAt: string | null
+          maxPoints: number
+          status: string
+          questionOrder: Json
+        }
+      }
+      save_attempt_answer: {
+        Args: {
+          p_attempt_id: string
+          p_question_id: string
+          p_selected_option_ids?: string[]
+          p_text_answer?: string | null
+        }
+        Returns: {
+          saved: boolean
+        }
+      }
+      submit_quiz_attempt: {
+        Args: {
+          p_attempt_id: string
+        }
+        Returns: {
+          attemptId: string
+          status: string
+          scorePoints: number
+          maxPoints: number
+          percent: number | null
+          passed: boolean | null
+          submittedAt: string | null
+        }
+      }
+      log_attempt_tab_switch: {
+        Args: {
+          p_attempt_id: string
+        }
+        Returns: {
+          tabSwitchCount: number
+        }
+      }
+      get_attempt_review: {
+        Args: {
+          p_attempt_id: string
+        }
+        Returns: Json
+      }
+      grade_attempt_answer: {
+        Args: {
+          p_attempt_id: string
+          p_question_id: string
+          p_points: number
+          p_feedback?: string | null
+        }
+        Returns: {
+          attemptId: string
+          scorePoints: number
+          maxPoints: number
+          percent: number
+          status: string
+        }
+      }
+      recompute_course_completion: {
+        Args: {
+          p_user_id: string
+          p_course_id: string
+        }
+        Returns: {
+          isComplete: boolean
+          newlyCompleted: boolean
+          progressPercent: number
+        }
       }
       verify_certificate: {
         Args: {

@@ -4,6 +4,7 @@ import {
   issueCourseCertificate,
   type IssueCertificateInput,
 } from "@/lib/certificates/issueCertificate"
+import { computeGrade } from "@/lib/assessments/grading"
 import { logError } from "@/lib/logging/logger"
 
 export type CompletionResult = {
@@ -77,10 +78,44 @@ export async function checkCourseCompletion(
     }
   }
 
+  // Calculate the learner's overall grade band across required quizzes
+  const { data: requiredQuizzes } = await client
+    .from("quizzes")
+    .select("id, pass_mark_percent")
+    .eq("course_id", courseId)
+    .eq("is_required", true)
+    .eq("is_published", true)
+    .neq("kind", "practice")
+
+  let computedGrade: string = "Distinction"
+
+  if (requiredQuizzes && requiredQuizzes.length > 0) {
+    const quizIds = requiredQuizzes.map((q) => q.id)
+    const { data: attempts } = await client
+      .from("quiz_attempts")
+      .select("quiz_id, percent")
+      .eq("user_id", userId)
+      .in("quiz_id", quizIds)
+      .eq("status", "graded")
+      .eq("passed", true)
+
+    const bestByQuiz = new Map<string, number>()
+    for (const att of attempts ?? []) {
+      const current = bestByQuiz.get(att.quiz_id) ?? -1
+      const p = Number(att.percent) || 0
+      if (p > current) bestByQuiz.set(att.quiz_id, p)
+    }
+
+    const scores = requiredQuizzes.map((q) => bestByQuiz.get(q.id) ?? 0)
+    const avgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length
+    computedGrade = computeGrade(avgScore) ?? "Pass"
+  }
+
   const input: IssueCertificateInput = {
     userId,
     courseId,
     courseTitle: course.title,
+    grade: computedGrade,
   }
   const result = await issueCourseCertificate(input)
 

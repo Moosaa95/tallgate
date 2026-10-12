@@ -2,6 +2,8 @@ export type QuizKind = "quiz" | "practice" | "exam"
 
 export type QuestionType = "single" | "multiple" | "true_false" | "short" | "essay"
 
+export type GradeBand = "Distinction" | "Merit" | "Pass"
+
 export type QuizSummary = {
   id: string
   module_id: string | null
@@ -20,6 +22,7 @@ export type QuizSummary = {
   attemptsRemaining: number | null
   bestPercent: number | null
   passed: boolean | null
+  gradeBand?: GradeBand | null
   inProgressAttemptId: string | null
   nextEligibleAt: string | null
 }
@@ -58,6 +61,7 @@ export type AttemptReview = {
   maxPoints: number
   percent: number | null
   passed: boolean | null
+  gradeBand?: GradeBand | null
   startedAt: string
   expiresAt: string | null
   submittedAt: string | null

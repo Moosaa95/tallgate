@@ -1,0 +1,110 @@
+import React from "react"
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
+import { ADMIN_QUERY_LIMIT } from "@/lib/admin/queryLimits"
+import PaymentsClient from "@/components/admin/PaymentsClient"
+import { logError } from "@/lib/logging/logger"
+
+export const metadata = {
+  title: "Payment Requests | TallGate Admin",
+  description: "Record offline payments and confirm them before access is granted.",
+}
+
+type PaymentWithCourse = {
+  id: string
+  user_id: string | null
+  course_id: string | null
+  full_name: string
+  email: string
+  phone: string | null
+  amount: number
+  currency: string
+  method: "bank_transfer" | "card" | "cash" | "other"
+  reference: string | null
+  status: "pending" | "confirmed" | "declined" | "refunded"
+  note: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+  updated_at: string
+  courses: { title: string } | null
+}
+
+export default async function AdminPaymentsPage() {
+  let requests: PaymentWithCourse[] = []
+  let courses: { id: string; title: string }[] = []
+  let learners: { id: string; full_name: string; email: string }[] = []
+  let loadWarning = ""
+  let loadFailed = false
+
+  if (!isSupabaseConfigured()) {
+    loadFailed = true
+    loadWarning = "Payment requests are unavailable because Supabase is not configured."
+  } else {
+    const supabase = await createClient()
+
+    const [{ data, error }, coursesResult, learnersResult] = await Promise.all([
+      supabase
+        .from("payment_requests")
+        .select("*, courses(title)")
+        .order("created_at", { ascending: false })
+        .limit(ADMIN_QUERY_LIMIT),
+      supabase.from("courses").select("id, title").order("title"),
+      supabase.from("profiles").select("id, full_name, email").order("full_name").limit(ADMIN_QUERY_LIMIT),
+    ])
+
+    if (error) {
+      loadFailed = true
+      logError("admin.payment_requests_load_failed", error)
+      loadWarning =
+        "Payment requests could not be loaded. Check that the payment_requests migration has been applied."
+    } else {
+      requests = (data ?? []).map((item) => ({
+        ...item,
+        courses: item.courses ?? null,
+      })) as PaymentWithCourse[]
+      if (requests.length === ADMIN_QUERY_LIMIT) {
+        loadWarning = `Showing the ${ADMIN_QUERY_LIMIT} most recent payment requests. Older records are not displayed, so the summary figures above may be incomplete.`
+      }
+    }
+
+    if (coursesResult.error) {
+      logError("admin.payments_courses_load_failed", coursesResult.error)
+      loadWarning = loadWarning
+        ? `${loadWarning} The course list could not be loaded, so new requests cannot be linked to a course.`
+        : "The course list could not be loaded, so new requests cannot be linked to a course."
+    } else {
+      courses = coursesResult.data ?? []
+    }
+
+    if (learnersResult.error) {
+      logError("admin.payments_profiles_load_failed", learnersResult.error)
+      loadWarning = loadWarning
+        ? `${loadWarning} The learner list could not be loaded.`
+        : "The learner list could not be loaded, so new requests cannot be linked to a learner."
+    } else {
+      learners = learnersResult.data ?? []
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white tracking-tight">Payment Requests</h1>
+        <p className="text-sm text-slate-300 mt-1">
+          Record offline payments against a learner and course, then confirm each one to grant access.
+        </p>
+      </div>
+
+      {loadWarning && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-500/40 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900"
+        >
+          {loadWarning}
+        </div>
+      )}
+
+      <PaymentsClient initialRequests={requests} courses={courses} learners={learners} loadFailed={loadFailed} />
+    </div>
+  )
+}

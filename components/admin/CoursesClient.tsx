@@ -1,0 +1,688 @@
+"use client"
+
+import React, { useState } from "react"
+import Link from "next/link"
+import { MockCourse } from "@/lib/data/adminMockData"
+import { formatNumber, getErrorMessage } from "@/lib/utils"
+import {
+  HiOutlineMagnifyingGlass,
+  HiOutlineStar,
+  HiOutlineArrowTopRightOnSquare,
+} from "react-icons/hi2"
+
+type CourseAction = {
+  success: boolean
+  message?: string
+  error?: string
+  course?: MockCourse
+  courses?: MockCourse[]
+}
+
+async function postCourseAction(action: string, payload: Record<string, unknown>) {
+  const res = await fetch("/api/admin/actions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, payload }),
+  })
+  const data = (await res.json().catch(() => null)) as CourseAction | null
+  if (!res.ok) throw new Error(getErrorMessage(data, "The change could not be saved."))
+  return data
+}
+
+const COURSE_LEVELS = ["Beginner", "Intermediate", "Advanced", "All Levels"] as const
+
+const emptyCourseForm = {
+  title: "",
+  category: "",
+  level: "Beginner",
+  price_ngn: "0",
+  duration: "",
+  short_description: "",
+  overview: "",
+  prerequisites: "",
+  learning_outcomes: "",
+  is_published: true,
+}
+
+export default function CoursesClient({
+  initialCourses,
+  knownDomains,
+}: {
+  initialCourses: MockCourse[]
+  knownDomains: string[]
+}) {
+  const [courses, setCourses] = useState<MockCourse[]>(initialCourses)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [domainFilter, setDomainFilter] = useState("all")
+  const [isUpdating, setIsUpdating] = useState<string | null>(null)
+  const [domainDrafts, setDomainDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(initialCourses.map((course) => [course.id, course.category]))
+  )
+  const [savingDomainId, setSavingDomainId] = useState<string | null>(null)
+  const [notice, setNotice] = useState("")
+  const [error, setError] = useState("")
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [courseForm, setCourseForm] = useState(emptyCourseForm)
+  const [isCreating, setIsCreating] = useState(false)
+  const [isSeeding, setIsSeeding] = useState(false)
+
+  const observedDomains = Array.from(
+    new Set(courses.map((course) => course.category).filter((category) => category.trim()))
+  )
+  const domainOptions = Array.from(new Set([...knownDomains, ...observedDomains])).sort((a, b) =>
+    a.localeCompare(b)
+  )
+
+  const filteredCourses = courses.filter((course) => {
+    const category = (course.category ?? "").trim()
+    const matchesSearch =
+      course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.short_description.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesDomain = domainFilter === "all" || category === domainFilter.trim()
+    return matchesSearch && matchesDomain
+  })
+
+  const groupedCourses = (() => {
+    if (domainFilter !== "all") {
+      return [{ domain: domainFilter.trim() || "Unassigned", courses: filteredCourses }]
+    }
+    const buckets = new Map<string, MockCourse[]>()
+    for (const course of filteredCourses) {
+      const domain = course.category.trim() || "Unassigned"
+      const bucket = buckets.get(domain)
+      if (bucket) bucket.push(course)
+      else buckets.set(domain, [course])
+    }
+    return domainOptions
+      .filter((domain) => buckets.has(domain))
+      .map((domain) => ({ domain, courses: buckets.get(domain) ?? [] }))
+      .concat(
+        Array.from(buckets.entries())
+          .filter(([domain]) => !domainOptions.includes(domain))
+          .map(([domain, grouped]) => ({ domain, courses: grouped }))
+      )
+  })()
+
+  const applyCourseUpdate = (courseId: string, patch: Partial<MockCourse>) => {
+    setCourses((prev) => prev.map((c) => (c.id === courseId ? { ...c, ...patch } : c)))
+  }
+
+  const runToggle = async (
+    course: MockCourse,
+    action: "toggle_course_publish" | "toggle_course_popular",
+    patch: Partial<MockCourse>,
+    revert: Partial<MockCourse>
+  ) => {
+    if (isUpdating) return
+    setIsUpdating(course.id)
+    setError("")
+    setNotice("")
+    applyCourseUpdate(course.id, patch)
+    try {
+      await postCourseAction(action, { id: course.id, ...patch })
+      setNotice(
+        action === "toggle_course_publish"
+          ? `${course.title} is now ${patch.is_published ? "published" : "a draft"}.`
+          : `${course.title} is now ${patch.is_popular ? "featured" : "standard"}.`
+      )
+    } catch (err) {
+      console.error(`Course action ${action} failed:`, err)
+      applyCourseUpdate(course.id, revert)
+      setError(getErrorMessage(err, "The course change could not be saved."))
+    } finally {
+      setIsUpdating(null)
+    }
+  }
+
+  const togglePublish = (course: MockCourse) =>
+    runToggle(
+      course,
+      "toggle_course_publish",
+      { is_published: !course.is_published },
+      { is_published: course.is_published }
+    )
+
+  const togglePopular = (course: MockCourse) =>
+    runToggle(
+      course,
+      "toggle_course_popular",
+      { is_popular: !course.is_popular },
+      { is_popular: course.is_popular }
+    )
+
+  const saveDomain = async (course: MockCourse) => {
+    const draft = (domainDrafts[course.id] ?? course.category).trim()
+    if (!draft) {
+      setError("Enter a domain name before saving.")
+      return
+    }
+    if (draft === (course.category ?? "").trim()) return
+    if (savingDomainId) return
+
+    setSavingDomainId(course.id)
+    setError("")
+    setNotice("")
+    try {
+      await postCourseAction("update_course_domain", { id: course.id, category: draft })
+      applyCourseUpdate(course.id, { category: draft })
+      setNotice(`${course.title} moved to the ${draft} domain.`)
+    } catch (err) {
+      console.error("Course domain update failed:", err)
+      setDomainDrafts((prev) => ({ ...prev, [course.id]: course.category }))
+      setError(getErrorMessage(err, "The domain could not be saved."))
+    } finally {
+      setSavingDomainId(null)
+    }
+  }
+
+  const mergeCourses = (incoming: MockCourse[]) => {
+    if (incoming.length === 0) return
+    setCourses((prev) => {
+      const byId = new Map(prev.map((course) => [course.id, course]))
+      for (const course of incoming) byId.set(course.id, course)
+      return Array.from(byId.values())
+    })
+    setDomainDrafts((prev) => {
+      const next = { ...prev }
+      for (const course of incoming) next[course.id] = course.category
+      return next
+    })
+  }
+
+  const submitNewCourse = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (isCreating) return
+    setError("")
+    setNotice("")
+    if (!courseForm.title.trim()) {
+      setError("Enter a course title.")
+      return
+    }
+    if (!courseForm.category.trim()) {
+      setError("Assign a domain for the course.")
+      return
+    }
+    if (!courseForm.duration.trim()) {
+      setError("Enter a duration (for example, 6 Weeks).")
+      return
+    }
+    if (!courseForm.short_description.trim()) {
+      setError("Add a short description.")
+      return
+    }
+    if (!courseForm.overview.trim()) {
+      setError("Add an overview.")
+      return
+    }
+
+    const learning_outcomes = courseForm.learning_outcomes
+      .split("\n")
+      .map((outcome) => outcome.trim())
+      .filter(Boolean)
+
+    setIsCreating(true)
+    try {
+      const data = await postCourseAction("create_course", {
+        title: courseForm.title,
+        category: courseForm.category,
+        level: courseForm.level,
+        price_ngn: courseForm.price_ngn,
+        duration: courseForm.duration,
+        short_description: courseForm.short_description,
+        overview: courseForm.overview,
+        prerequisites: courseForm.prerequisites,
+        learning_outcomes,
+        is_published: courseForm.is_published,
+      })
+      if (data?.course) mergeCourses([data.course])
+      setNotice(data?.message ?? "Course created.")
+      setCourseForm(emptyCourseForm)
+      setShowAddForm(false)
+    } catch (err) {
+      console.error("Course creation failed:", err)
+      setError(getErrorMessage(err, "The course could not be created."))
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const runSeed = async () => {
+    if (isSeeding) return
+    setIsSeeding(true)
+    setError("")
+    setNotice("")
+    try {
+      const data = await postCourseAction("seed_learning_hub_courses", {})
+      if (data?.courses) mergeCourses(data.courses)
+      setNotice(data?.message ?? "Learning Hub catalogue synced.")
+    } catch (err) {
+      console.error("Catalogue seed failed:", err)
+      setError(getErrorMessage(err, "The catalogue could not be synced."))
+    } finally {
+      setIsSeeding(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {(error || notice) && (
+        <p
+          role={error ? "alert" : "status"}
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            error
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          {error || notice}
+        </p>
+      )}
+
+      {/* Control Header */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-card space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Academy Course Catalog & Curricula
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Assign each course to a domain, control publication, and jump to its lesson materials.
+            </p>
+          </div>
+          <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 self-start sm:self-auto">
+            {filteredCourses.length} Courses Active
+          </span>
+        </div>
+
+        {/* Search & Filter */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 pt-2 border-t border-slate-100">
+          <div className="relative flex-1 max-w-md">
+            <HiOutlineMagnifyingGlass className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search courses..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-brand-primary focus:outline-none transition-all"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="domain-filter" className="text-xs font-semibold text-slate-500">
+              Domain
+            </label>
+            <select
+              id="domain-filter"
+              value={domainFilter}
+              onChange={(e) => setDomainFilter(e.target.value)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 focus:outline-none"
+            >
+              <option value="all">All Domains</option>
+              {domainOptions.map((domain) => {
+                const count = courses.filter(
+                  (course) => (course.category || "").trim() === domain
+                ).length
+                return (
+                  <option key={domain} value={domain}>
+                    {domain} ({count})
+                  </option>
+                )
+              })}
+            </select>
+          </div>
+        </div>
+
+        {/* Catalogue actions */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={runSeed}
+            disabled={isSeeding}
+            className="rounded-lg border border-brand-primary/30 bg-brand-light px-3 py-1.5 text-xs font-bold text-brand-primary transition-all hover:bg-brand-primary hover:text-white disabled:opacity-60"
+          >
+            {isSeeding ? "Syncing…" : "Seed Learning Hub Courses"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAddForm((value) => !value)}
+            className="rounded-lg bg-brand-primary px-3 py-1.5 text-xs font-bold text-white transition-all hover:opacity-90"
+          >
+            {showAddForm ? "Close" : "Add Course"}
+          </button>
+        </div>
+      </div>
+
+      {showAddForm && (
+        <form
+          onSubmit={submitNewCourse}
+          className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-card space-y-4"
+        >
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Add a course</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Creates the course in Supabase and adds its default &ldquo;Package Curriculum&rdquo; module.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="block">
+              <span className="form-label">Title</span>
+              <input
+                type="text"
+                required
+                maxLength={200}
+                value={courseForm.title}
+                onChange={(e) => setCourseForm((prev) => ({ ...prev, title: e.target.value }))}
+                className="form-input"
+                placeholder="Course title"
+              />
+            </label>
+            <label className="block">
+              <span className="form-label">Domain</span>
+              <input
+                type="text"
+                required
+                list="course-domain-options"
+                maxLength={80}
+                value={courseForm.category}
+                onChange={(e) => setCourseForm((prev) => ({ ...prev, category: e.target.value }))}
+                className="form-input"
+                placeholder="e.g. Development"
+              />
+            </label>
+            <label className="block">
+              <span className="form-label">Level</span>
+              <select
+                value={courseForm.level}
+                onChange={(e) => setCourseForm((prev) => ({ ...prev, level: e.target.value }))}
+                className="form-input"
+              >
+                {COURSE_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="form-label">Duration</span>
+              <input
+                type="text"
+                required
+                maxLength={80}
+                value={courseForm.duration}
+                onChange={(e) => setCourseForm((prev) => ({ ...prev, duration: e.target.value }))}
+                className="form-input"
+                placeholder="e.g. 6 Weeks"
+              />
+            </label>
+            <label className="block">
+              <span className="form-label">Price (₦)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                max={99999999.99}
+                value={courseForm.price_ngn}
+                onChange={(e) => setCourseForm((prev) => ({ ...prev, price_ngn: e.target.value }))}
+                className="form-input"
+              />
+            </label>
+            <label className="flex items-center gap-2 self-end pb-2">
+              <input
+                type="checkbox"
+                checked={courseForm.is_published}
+                onChange={(e) =>
+                  setCourseForm((prev) => ({ ...prev, is_published: e.target.checked }))
+                }
+              />
+              <span className="text-xs font-semibold text-slate-600">Publish immediately</span>
+            </label>
+          </div>
+          <label className="block">
+            <span className="form-label">Short description</span>
+            <input
+              type="text"
+              required
+              maxLength={300}
+              value={courseForm.short_description}
+              onChange={(e) =>
+                setCourseForm((prev) => ({ ...prev, short_description: e.target.value }))
+              }
+              className="form-input"
+              placeholder="One-line summary shown in the catalogue"
+            />
+          </label>
+          <label className="block">
+            <span className="form-label">Overview</span>
+            <textarea
+              rows={3}
+              maxLength={2000}
+              value={courseForm.overview}
+              onChange={(e) => setCourseForm((prev) => ({ ...prev, overview: e.target.value }))}
+              className="form-input"
+              placeholder="What learners will achieve"
+            />
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="block">
+              <span className="form-label">Prerequisites (optional)</span>
+              <input
+                type="text"
+                maxLength={500}
+                value={courseForm.prerequisites}
+                onChange={(e) =>
+                  setCourseForm((prev) => ({ ...prev, prerequisites: e.target.value }))
+                }
+                className="form-input"
+                placeholder="e.g. No prior experience required."
+              />
+            </label>
+            <label className="block">
+              <span className="form-label">Learning outcomes (one per line)</span>
+              <textarea
+                rows={3}
+                value={courseForm.learning_outcomes}
+                onChange={(e) =>
+                  setCourseForm((prev) => ({ ...prev, learning_outcomes: e.target.value }))
+                }
+                className="form-input"
+                placeholder={"Web Development\nDomain & Hosting"}
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              type="submit"
+              disabled={isCreating}
+              className="rounded-lg bg-brand-primary px-4 py-2 text-xs font-bold text-white transition-all hover:opacity-90 disabled:opacity-60"
+            >
+              {isCreating ? "Creating…" : "Create Course"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddForm(false)
+                setCourseForm(emptyCourseForm)
+              }}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      <datalist id="course-domain-options">
+        {domainOptions.map((domain) => (
+          <option key={domain} value={domain} />
+        ))}
+      </datalist>
+
+      {courses.length === 0 ? (
+        <div
+          role="status"
+          className="bg-white rounded-2xl p-8 border border-slate-200/90 shadow-card text-center space-y-3"
+        >
+          <h2 className="text-lg font-bold text-slate-900">No courses in the catalogue yet</h2>
+          <p className="mx-auto max-w-xl text-sm text-slate-500">
+            Seed the six authored Learning Hub packages (Appreciation, Advanced, Digital, Security,
+            Developer and Digital Health) into Supabase, or add a course manually.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={runSeed}
+              disabled={isSeeding}
+              className="rounded-lg bg-brand-primary px-4 py-2 text-xs font-bold text-white transition-all hover:opacity-90 disabled:opacity-60"
+            >
+              {isSeeding ? "Seeding…" : "Seed Learning Hub Courses"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddForm(true)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              Add Course
+            </button>
+          </div>
+        </div>
+      ) : groupedCourses.length === 0 ? (
+        <div className="bg-white rounded-2xl p-8 border border-slate-200/90 shadow-card text-center text-sm text-slate-500">
+          No courses match the current search and domain filter.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
+          {groupedCourses.map((group) => (
+            <div key={group.domain} className="min-w-0 space-y-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-base font-semibold uppercase tracking-wide text-white sm:text-lg">
+                  {group.domain}
+                </h2>
+                <span className="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-[#031544]">
+                  {group.courses.length}
+                </span>
+                <div className="h-px flex-1 bg-white/30" />
+              </div>
+              {group.courses.length === 0 ? (
+                <div className="rounded-lg border border-slate-200 bg-white p-4 text-xs text-slate-500">
+                  No courses in this domain match the current search.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-6">
+                  {group.courses.map((course) => (
+                    <div
+                      key={course.id}
+                      className="flex w-full min-w-0 flex-col gap-4 rounded-2xl border border-slate-200/90 bg-white p-6 transition-all hover:border-slate-300 hover:shadow-md"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-primary">
+                            <span className="sr-only">Domain for {course.title}</span>
+                            <input
+                              list="course-domain-options"
+                              value={domainDrafts[course.id] ?? course.category}
+                              onChange={(e) =>
+                                setDomainDrafts((prev) => ({ ...prev, [course.id]: e.target.value }))
+                              }
+                              disabled={savingDomainId === course.id}
+                              maxLength={80}
+                              placeholder="Assign domain"
+                              className="w-36 rounded-md border border-brand-primary/20 bg-brand-light px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary disabled:opacity-60"
+                            />
+                            {(domainDrafts[course.id] ?? course.category).trim() !==
+                              course.category.trim() && (
+                              <button
+                                type="button"
+                                onClick={() => saveDomain(course)}
+                                disabled={savingDomainId === course.id}
+                                className="rounded bg-brand-primary px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white hover:opacity-90 disabled:opacity-50"
+                              >
+                                {savingDomainId === course.id ? "Saving" : "Save"}
+                              </button>
+                            )}
+                          </label>
+                          <span className="text-xs font-bold text-slate-900">
+                            ₦{formatNumber(course.price_ngn)}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3 className="line-clamp-2 text-base font-bold text-slate-900">{course.title}</h3>
+                          <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-slate-500">
+                            {course.short_description}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-2 text-sm text-slate-600">
+                          <span>⏱ {course.duration}</span>
+                          <span>•</span>
+                          <span>🎓 {course.level}</span>
+                          <span>•</span>
+                          <span className="font-semibold text-slate-800">
+                            👥 {course.enrollment_count} Enrolled
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Admin Toggles & Links */}
+                      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                        <div className="flex items-center gap-2">
+                          {/* Publish Toggle */}
+                          <button
+                            onClick={() => togglePublish(course)}
+                            disabled={isUpdating === course.id}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-60 ${
+                              course.is_published
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                            }`}
+                          >
+                            {course.is_published ? "Published" : "Draft"}
+                          </button>
+
+                          {/* Popular Toggle */}
+                          <button
+                            onClick={() => togglePopular(course)}
+                            disabled={isUpdating === course.id}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-60 ${
+                              course.is_popular
+                                ? "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100"
+                                : "bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                            }`}
+                            title="Spotlight on Landing / Hub"
+                          >
+                            <HiOutlineStar className={`w-3.5 h-3.5 ${course.is_popular ? "fill-amber-500 text-amber-500" : ""}`} />
+                            <span>{course.is_popular ? "Featured" : "Standard"}</span>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <Link
+                            href={`/admin/course-content?course=${course.id}`}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-brand-primary"
+                          >
+                            <span>Materials</span>
+                            <HiOutlineArrowTopRightOnSquare className="h-3.5 w-3.5" />
+                          </Link>
+                          <Link
+                            href={`/learning-hub`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-brand-primary hover:underline"
+                          >
+                            <span>Live Preview</span>
+                            <HiOutlineArrowTopRightOnSquare className="h-3.5 w-3.5" />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

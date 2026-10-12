@@ -41,12 +41,30 @@ function getCalendarDateParts(dateString: string) {
   return { year, month, day }
 }
 
+export function getOrdinalSuffix(day: number): string {
+  if (day >= 11 && day <= 13) return "th"
+  switch (day % 10) {
+    case 1:
+      return "st"
+    case 2:
+      return "nd"
+    case 3:
+      return "rd"
+    default:
+      return "th"
+  }
+}
+
 export function formatCertificateIssueDate(
   dateString: string,
-  format: "numeric" | "long" = "numeric"
+  format: "numeric" | "long" | "ordinal" = "numeric"
 ): string {
   const date = getCalendarDateParts(dateString)
   if (!date) return dateString
+
+  if (format === "ordinal") {
+    return `${date.day}${getOrdinalSuffix(date.day)} ${MONTH_NAMES[date.month - 1]} ${date.year}`
+  }
 
   if (format === "long") {
     return `${date.day} ${MONTH_NAMES[date.month - 1]} ${date.year}`

@@ -46,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={inter.variable} data-scroll-behavior="smooth">
       <body className="min-h-screen bg-brand-canvas text-slate-900 antialiased flex flex-col">
         <NavigationProgressBar />
         {children}

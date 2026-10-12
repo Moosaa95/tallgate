@@ -17,7 +17,8 @@ import { HiOutlineMail, HiOutlineLockClosed, HiOutlineUser, HiOutlineInformation
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    fullName: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
     accountType: "learner",
@@ -45,13 +46,14 @@ export default function RegisterPage() {
 
     try {
       const supabase = createClient()
+      const fullName = `${formData.firstName} ${formData.lastName}`.trim()
       const { data, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
-            full_name: formData.fullName,
+            full_name: fullName,
             account_type: formData.accountType,
           },
         },
@@ -104,23 +106,45 @@ export default function RegisterPage() {
       )}
 
       <form onSubmit={handleRegister} className="space-y-4">
-        <div>
-          <label htmlFor="fullName" className="form-label">
-            Full Name
-            <span className="ml-1 font-normal text-slate-500">(required)</span>
-          </label>
-          <div className="relative">
-            <input
-              id="fullName"
-              name="fullName"
-              type="text"
-              required
-              value={formData.fullName}
-              onChange={handleChange}
-              placeholder="e.g. Musa Abdullahi"
-              className="form-input text-sm pl-9"
-            />
-            <HiOutlineUser className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="firstName" className="form-label">
+              First Name
+              <span className="ml-1 font-normal text-slate-500">(required)</span>
+            </label>
+            <div className="relative">
+              <input
+                id="firstName"
+                name="firstName"
+                type="text"
+                required
+                value={formData.firstName}
+                onChange={handleChange}
+                placeholder="e.g. Musa"
+                className="form-input text-sm pl-9"
+              />
+              <HiOutlineUser className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="lastName" className="form-label">
+              Last Name
+              <span className="ml-1 font-normal text-slate-500">(required)</span>
+            </label>
+            <div className="relative">
+              <input
+                id="lastName"
+                name="lastName"
+                type="text"
+                required
+                value={formData.lastName}
+                onChange={handleChange}
+                placeholder="e.g. Abdullahi"
+                className="form-input text-sm pl-9"
+              />
+              <HiOutlineUser className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            </div>
           </div>
         </div>
 

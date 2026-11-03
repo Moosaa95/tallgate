@@ -1,5 +1,6 @@
 import CourseContentAdminClient from "@/components/admin/CourseContentAdminClient"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
+import { isCloudinaryConfigured } from "@/lib/storage/cloudinary"
 import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
@@ -68,7 +69,7 @@ export default async function AdminCourseContentPage({
       <div>
         <h1 className="text-2xl font-bold text-white">Course Materials & Live Classes</h1>
         <p className="mt-1 text-sm text-slate-300">
-          Upload PDF/PPTX lesson handouts individually or by the folder, and schedule classes with external meeting links.
+          Upload lesson handouts (PDF/PPTX) and videos directly to Cloudinary, and schedule classes with external meeting links.
         </p>
       </div>
       {failures.length > 0 && (
@@ -82,6 +83,7 @@ export default async function AdminCourseContentPage({
             ? requestedCourseId
             : (coursesResult.data ?? [])[0]?.id ?? ""
         }
+        cloudinaryConfigured={isCloudinaryConfigured()}
         courses={(coursesResult.data ?? []).map((course) => ({
           id: course.id,
           title: course.title,

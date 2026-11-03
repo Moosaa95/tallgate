@@ -60,13 +60,39 @@ export async function getLessonContent(
   }
 
   const isDocument = lesson.content_type === "document";
+
+  // If the content is hosted on Cloudinary or an external URL, serve it directly without Supabase storage
+  if (
+    content.content_url.startsWith("http://") ||
+    content.content_url.startsWith("https://")
+  ) {
+    const cleanUrl = content.content_url.split("?")[0];
+    const rawFileName = cleanUrl.split("/").at(-1) || "course-material";
+    const fileName = decodeURIComponent(rawFileName);
+
+    if (isDocument) {
+      return {
+        access: "granted",
+        contentType: "document",
+        signedUrl: content.content_url,
+        fileName,
+      };
+    }
+
+    return {
+      access: "granted",
+      contentType: "video",
+      signedUrl: content.content_url,
+    };
+  }
+
   const { data: signed, error } = await supabase.storage
     .from("course-content")
     .createSignedUrl(
       content.content_url,
       60 * 60,
       isDocument ? { download: true } : undefined
-    )
+    );
 
   if (error || !signed) {
     logError("lesson.content_sign_failed", error, { lessonId })

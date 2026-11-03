@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { buildObjectPath } from "@/lib/admin/courseContentPaths"
+import { uploadToCloudinary } from "@/lib/storage/clientUpload"
 import { getErrorMessage } from "@/lib/utils"
 import type { Database } from "@/types/supabase"
 import {
@@ -49,6 +50,7 @@ type CourseContentAdminClientProps = {
   modules: Module[]
   lessons: Lesson[]
   sessions: SessionView[]
+  cloudinaryConfigured?: boolean
 }
 
 const POWERPOINT_MIME =
@@ -81,14 +83,52 @@ function fileExtension(fileName: string) {
   return (fileName.split(".").pop() ?? "").toLowerCase()
 }
 
-function contentTypeFor(fileName: string) {
+export type MediaTypeInfo = {
+  category: "document" | "video"
+  mimeType: string
+  cloudinaryResourceType: "auto" | "video" | "raw"
+}
+
+export function mediaTypeFor(fileName: string): MediaTypeInfo | null {
   const extension = fileExtension(fileName)
-  if (extension === "pdf") return "application/pdf"
-  if (extension === "pptx") return POWERPOINT_MIME
+  if (extension === "pdf") {
+    return { category: "document", mimeType: "application/pdf", cloudinaryResourceType: "auto" }
+  }
+  if (extension === "pptx") {
+    return { category: "document", mimeType: POWERPOINT_MIME, cloudinaryResourceType: "raw" }
+  }
+  if (extension === "ppt") {
+    return { category: "document", mimeType: "application/vnd.ms-powerpoint", cloudinaryResourceType: "raw" }
+  }
+  if (extension === "docx") {
+    return {
+      category: "document",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      cloudinaryResourceType: "raw",
+    }
+  }
+  if (extension === "doc") {
+    return { category: "document", mimeType: "application/msword", cloudinaryResourceType: "raw" }
+  }
+  if (["mp4", "webm", "mov", "m4v"].includes(extension)) {
+    const mime =
+      extension === "mp4"
+        ? "video/mp4"
+        : extension === "webm"
+          ? "video/webm"
+          : extension === "mov"
+            ? "video/quicktime"
+            : "video/mp4"
+    return { category: "video", mimeType: mime, cloudinaryResourceType: "video" }
+  }
   return null
 }
 
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+function contentTypeFor(fileName: string) {
+  return mediaTypeFor(fileName)?.mimeType ?? null
+}
+
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 function exceedsUploadLimit(fileSize: number) {
   return fileSize > MAX_UPLOAD_BYTES
@@ -103,7 +143,7 @@ function relativePathOf(file: File) {
   return withPath && withPath.trim() ? withPath : file.name
 }
 
-const SUPPORTED_EXTENSIONS = ["pdf", "pptx"]
+const SUPPORTED_EXTENSIONS = ["pdf", "pptx", "ppt", "docx", "doc", "mp4", "webm", "mov", "m4v"]
 
 function stripSupportedExtension(value: string) {
   const extension = fileExtension(value)
@@ -223,6 +263,7 @@ type AttachResult = {
   replacedFile: boolean
   cleanupWarning: boolean
   preservedText: boolean
+  isCloudinary?: boolean
 }
 
 export default function CourseContentAdminClient({
@@ -231,7 +272,9 @@ export default function CourseContentAdminClient({
   modules,
   lessons: initialLessons,
   sessions: initialSessions,
+  cloudinaryConfigured = false,
 }: CourseContentAdminClientProps) {
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const supabase = useMemo(() => createClient(), [])
   const folderInputRef = useRef<HTMLInputElement>(null)
   const [lessons, setLessons] = useState(initialLessons)
@@ -354,10 +397,13 @@ export default function CourseContentAdminClient({
   const attachDocument = async (
     targetLesson: Pick<Lesson, "id" | "course_id">,
     selectedFile: File,
-    objectPath: string
+    objectPath: string,
+    onProgress?: (percentage: number) => void
   ): Promise<AttachResult> => {
-    const contentType = contentTypeFor(selectedFile.name)
-    if (!contentType) throw new Error("Only PDF and PPTX files are supported.")
+    const mediaInfo = mediaTypeFor(selectedFile.name)
+    if (!mediaInfo) {
+      throw new Error("Only PDF, PPTX, and video (MP4, WebM, MOV) files are supported.")
+    }
 
     const { data: previousContent, error: previousError } = await supabase
       .from("lesson_content")
@@ -366,10 +412,27 @@ export default function CourseContentAdminClient({
       .maybeSingle()
     if (previousError) throw previousError
 
-    const { error: uploadError } = await supabase.storage
-      .from("course-content")
-      .upload(objectPath, selectedFile, { contentType, upsert: false })
-    if (uploadError) throw uploadError
+    let uploadedUrl: string
+    let isCloudinary = false
+
+    // Attempt Cloudinary upload first
+    try {
+      const folder = `tallgate/course-content/${targetLesson.course_id}/${targetLesson.id}`
+      const cloudinaryResult = await uploadToCloudinary(selectedFile, {
+        folder,
+        resourceType: mediaInfo.cloudinaryResourceType,
+        onProgress: (p) => onProgress?.(p.percentage),
+      })
+      uploadedUrl = cloudinaryResult.secure_url
+      isCloudinary = true
+    } catch (cloudinaryError) {
+      console.warn("Cloudinary upload failed or not configured, falling back to Supabase storage:", cloudinaryError)
+      const { error: uploadError } = await supabase.storage
+        .from("course-content")
+        .upload(objectPath, selectedFile, { contentType: mediaInfo.mimeType, upsert: false })
+      if (uploadError) throw uploadError
+      uploadedUrl = objectPath
+    }
 
     try {
       const { error: contentError } = await supabase
@@ -377,20 +440,16 @@ export default function CourseContentAdminClient({
         .upsert(
           {
             lesson_id: targetLesson.id,
-            content_url: objectPath,
+            content_url: uploadedUrl,
             content_body: previousContent?.content_body ?? null,
           },
           { onConflict: "lesson_id" }
         )
       if (contentError) throw contentError
 
-      // RLS hides rows instead of raising errors, so a blocked update looks
-      // like a success that changed nothing. Verify a row was written,
-      // otherwise the lesson would keep serving its old content type while
-      // lesson_content points at the new file.
       const { data: updatedLesson, error: lessonError } = await supabase
         .from("lessons")
-        .update({ content_type: "document" })
+        .update({ content_type: mediaInfo.category })
         .eq("id", targetLesson.id)
         .select("id, module_id, title, content_type, is_preview, order_index")
         .maybeSingle()
@@ -402,13 +461,29 @@ export default function CourseContentAdminClient({
       }
 
       let cleanupWarning = false
-      if (previousContent?.content_url && previousContent.content_url !== objectPath) {
-        const { error: cleanupError } = await supabase.storage
-          .from("course-content")
-          .remove([previousContent.content_url])
-        if (cleanupError) {
-          console.error("Previous course file could not be removed:", cleanupError)
-          cleanupWarning = true
+      if (previousContent?.content_url && previousContent.content_url !== uploadedUrl) {
+        if (
+          previousContent.content_url.startsWith("http://") ||
+          previousContent.content_url.startsWith("https://")
+        ) {
+          try {
+            const cleanupRes = await fetch("/api/admin/media/delete", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: previousContent.content_url }),
+            })
+            if (!cleanupRes.ok) cleanupWarning = true
+          } catch {
+            cleanupWarning = true
+          }
+        } else {
+          const { error: cleanupError } = await supabase.storage
+            .from("course-content")
+            .remove([previousContent.content_url])
+          if (cleanupError) {
+            console.error("Previous course file could not be removed from Supabase:", cleanupError)
+            cleanupWarning = true
+          }
         }
       }
 
@@ -419,7 +494,7 @@ export default function CourseContentAdminClient({
         content_type: updatedLesson.content_type,
         is_preview: updatedLesson.is_preview,
         order_index: updatedLesson.order_index,
-        content_url: objectPath,
+        content_url: uploadedUrl,
         course_id: targetLesson.course_id,
       })
 
@@ -427,6 +502,7 @@ export default function CourseContentAdminClient({
         replacedFile: Boolean(previousContent?.content_url),
         cleanupWarning,
         preservedText: Boolean(previousContent?.content_body),
+        isCloudinary,
       }
     } catch (attachError) {
       if (previousContent) {
@@ -443,10 +519,19 @@ export default function CourseContentAdminClient({
       } else {
         await supabase.from("lesson_content").delete().eq("lesson_id", targetLesson.id)
       }
-      const { error: cleanupError } = await supabase.storage
-        .from("course-content")
-        .remove([objectPath])
-      if (cleanupError) console.error("Uploaded course file could not be removed:", cleanupError)
+
+      if (isCloudinary) {
+        await fetch("/api/admin/media/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: uploadedUrl }),
+        }).catch(() => {})
+      } else {
+        const { error: cleanupError } = await supabase.storage
+          .from("course-content")
+          .remove([uploadedUrl])
+        if (cleanupError) console.error("Uploaded course file could not be removed:", cleanupError)
+      }
       throw attachError
     }
   }
@@ -459,11 +544,12 @@ export default function CourseContentAdminClient({
 
     const lesson = lessons.find((item) => item.id === lessonId)
     if (!lesson || !file) {
-      setError("Select a lesson and a PDF or PPTX file.")
+      setError("Select a lesson and a media file (PDF, PPTX, or Video).")
       return
     }
-    if (!contentTypeFor(file.name)) {
-      setError("Only PDF and PPTX files are supported.")
+    const mediaInfo = mediaTypeFor(file.name)
+    if (!mediaInfo) {
+      setError("Only PDF, PPTX, and video (MP4, WebM, MOV) files are supported.")
       return
     }
     if (exceedsUploadLimit(file.size)) {
@@ -472,27 +558,30 @@ export default function CourseContentAdminClient({
     }
 
     setIsUploading(true)
+    setUploadProgress(0)
     try {
       const objectPath = buildObjectPath(lesson.course_id, lesson.id, file.name)
-      const result = await attachDocument(lesson, file, objectPath)
+      const result = await attachDocument(lesson, file, objectPath, (pct) => setUploadProgress(pct))
       setFile(null)
       form.reset()
+      const storageTypeLabel = result.isCloudinary ? "Cloudinary" : "storage"
       setNotice(
         result.cleanupWarning
-          ? "The new document is attached, but the previous storage file could not be removed."
+          ? `The new ${mediaInfo.category} is attached to ${storageTypeLabel}, but the previous file could not be removed.`
           : result.replacedFile
             ? result.preservedText
-              ? "The lesson document was replaced (existing text content was preserved)."
-              : "The lesson document was replaced."
+              ? `The lesson ${mediaInfo.category} was replaced (existing text content was preserved).`
+              : `The lesson ${mediaInfo.category} was replaced.`
             : result.preservedText
-              ? "Course document uploaded and attached to the lesson (existing text content was preserved)."
-              : "Course document uploaded and attached to the lesson."
+              ? `Course ${mediaInfo.category} uploaded and attached to the lesson (existing text content was preserved).`
+              : `Course ${mediaInfo.category} uploaded and attached to the lesson.`
       )
     } catch (uploadError: unknown) {
-      console.error("Course document upload failed:", uploadError)
-      setError(getErrorMessage(uploadError, "Course document could not be uploaded."))
+      console.error("Course media upload failed:", uploadError)
+      setError(getErrorMessage(uploadError, "Course media could not be uploaded."))
     } finally {
       setIsUploading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -524,11 +613,12 @@ export default function CourseContentAdminClient({
         message: "",
       }
 
-      if (!contentTypeFor(fileName)) {
+      const mediaInfo = mediaTypeFor(fileName)
+      if (!mediaInfo) {
         planned.push({
           ...base,
           status: "skipped",
-          message: "Only PDF and PPTX files are supported.",
+          message: "Only PDF, PPTX, and video files are supported.",
         })
         continue
       }
@@ -581,10 +671,13 @@ export default function CourseContentAdminClient({
     const targetModule = modulesInCourse[0]
     if (!targetModule) throw new Error("This course has no module to hold a new lesson.")
 
+    const mediaInfo = mediaTypeFor(fileName)
+    const contentType = mediaInfo?.category ?? "document"
+
     const insertData: LessonInsert = {
       module_id: targetModule.id,
       title: lessonTitleFromFile(fileName),
-      content_type: "document",
+      content_type: contentType,
       order_index: orderIndex,
       is_preview: false,
     }
@@ -835,10 +928,26 @@ export default function CourseContentAdminClient({
       )}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <h2 className="text-lg font-bold text-slate-900">Upload a lesson document</h2>
-        <p className="mt-1 text-xs text-slate-600">
-          PDF and PowerPoint files are stored privately and exposed to enrolled learners through a temporary download link.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Upload lesson media</h2>
+            <p className="mt-1 text-xs text-slate-600">
+              PDF, PowerPoint, and video files are uploaded directly to Cloudinary storage and delivered to enrolled learners through secure streaming and download links.
+            </p>
+          </div>
+          <div>
+            {cloudinaryConfigured ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Cloudinary Storage Active
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 border border-amber-200">
+                Supabase Storage Fallback (Cloudinary not configured)
+              </span>
+            )}
+          </div>
+        </div>
         <form onSubmit={handleDocumentUpload} className="mt-5 grid gap-4 md:grid-cols-3">
           <label className="text-xs font-semibold text-slate-700">
             Course
@@ -917,16 +1026,16 @@ export default function CourseContentAdminClient({
             </span>
           </label>
           <label className="text-xs font-semibold text-slate-700">
-            PDF or PPTX
+            PDF, PPTX, or Video (MP4/WebM)
             <input
               required
               type="file"
-              accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+              accept=".pdf,.pptx,.ppt,.docx,.doc,.mp4,.webm,.mov,application/pdf,video/*"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               className="form-input mt-1 file:mr-3 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-1 file:text-xs file:font-semibold"
             />
             <span className="mt-1 block font-normal text-slate-500">
-              Replaces the file attached to the selected lesson.
+              Replaces the media file attached to the selected lesson.
             </span>
           </label>
           <button
@@ -934,7 +1043,11 @@ export default function CourseContentAdminClient({
             disabled={isUploading || courses.length === 0 || !lessonId || !file}
             className="btn-primary text-xs disabled:opacity-50 md:col-span-3 md:justify-self-end"
           >
-            {isUploading ? "Uploading..." : "Upload and attach"}
+            {isUploading
+              ? uploadProgress !== null
+                ? `Uploading (${uploadProgress}%)...`
+                : "Uploading..."
+              : "Upload and attach"}
           </button>
         </form>
       </section>
@@ -944,7 +1057,7 @@ export default function CourseContentAdminClient({
           <div>
             <h2 className="text-lg font-bold text-slate-900">Upload a folder of materials</h2>
             <p className="mt-1 text-xs text-slate-600">
-              Pick a folder from your computer. Every PDF and PPTX inside it is matched to a lesson in the selected
+              Pick a folder from your computer. Every PDF, PPTX, and video inside it is matched to a lesson in the selected
               course by file name, and files that cannot be matched are reported instead of attached to the wrong lesson.
             </p>
           </div>

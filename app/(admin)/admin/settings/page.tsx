@@ -107,7 +107,7 @@ export default async function AdminSettingsPage() {
             <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               Support email
             </dt>
-            <dd className="mt-0.5 text-slate-900">{siteConfig.contact.email}</dd>
+            <dd className="mt-0.5 text-slate-900">{siteConfig.supportEmail}</dd>
           </div>
         </dl>
       </div>

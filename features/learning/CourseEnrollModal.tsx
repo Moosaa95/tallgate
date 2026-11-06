@@ -214,7 +214,7 @@ export default function CourseEnrollModal({ isOpen, onClose, course }: CourseEnr
                 onChange={handleChange}
                 className="form-select min-h-11 text-xs py-2"
               >
-                <option value={`In-Person Lab (${siteConfig.campus})`}>In-Person Lab ({siteConfig.campus})</option>
+                <option value={`In-person lab (${siteConfig.campus})`}>In-person lab ({siteConfig.campus})</option>
                 <option value="Virtual / Hybrid (Live Online)">Virtual / Hybrid (Live Online)</option>
                 <option value="Self-Paced Digital Track">Self-Paced Digital Track</option>
               </select>

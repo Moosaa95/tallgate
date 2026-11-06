@@ -6,8 +6,8 @@ const whatsappDigits = whatsappNumber.replace(/\D/g, "")
 
 const phoneDisplay = `+${whatsappDigits.slice(0, 3)} ${whatsappDigits.slice(3, 6)} ${whatsappDigits.slice(6, 9)} ${whatsappDigits.slice(9)}`
 
-const addressLine1 = "No 2, F.O Eburuche Close"
-const addressLine2 = "Gbazango Extension, FCT, Nigeria"
+const addressLine1 = "Federal Capital Territory"
+const addressLine2 = "Nigeria"
 
 const rcNumber = "9365381"
 
@@ -30,9 +30,9 @@ export const siteConfig = {
   address: {
     line1: addressLine1,
     line2: addressLine2,
-    short: addressLine2,
+    short: `${addressLine1}, ${addressLine2}`,
   },
-  campus: "Kubwa, Abuja",
+  campus: "Not Available",
   social: {
     twitter: "https://x.com/tallgate_ng",
     twitterHandle: "@tallgate_ng",

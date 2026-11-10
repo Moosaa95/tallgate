@@ -11,7 +11,7 @@ import {
   toCourseInsert,
   type ExistingCatalogueCourse,
 } from "@/lib/admin/catalogueSeed"
-import { issueCourseCertificate, type IssueCertificateFailure } from "@/lib/certificates/issueCertificate"
+import { issueCourseCertificate, type IssueCertificateFailure, claimAndSendCertificateEmail, releaseStaleEmailLeases } from "@/lib/certificates/issueCertificate"
 import { checkCourseCompletion } from "@/lib/assessments/completion"
 import { toCourse } from "@/lib/data/adminRowMappers"
 import { coursesData } from "@/lib/data/courses"
@@ -885,6 +885,100 @@ async function handleAdminAction(
         return NextResponse.json({ success: true, message: "Certificate validity toggled" })
       }
 
+      case "resend_certificate_email": {
+        const { id } = payload
+        if (!isNonEmptyString(id)) {
+          return NextResponse.json({ error: "A certificate id is required." }, { status: 400 })
+        }
+
+        const adminClient = createAdminClient()
+
+        // Release any stale sending leases before attempting retry
+        await releaseStaleEmailLeases()
+
+        // Fetch certificate with user email and PDF
+        const { data: cert, error: certError } = await adminClient
+          .from("certificates")
+          .select("id, certificate_number, verification_code, recipient_name, user_id, course_title, issue_date, grade, storage_path, email_status, email_sent_at, email_error, email_retry_count")
+          .eq("id", id)
+          .maybeSingle()
+
+        if (certError || !cert) {
+          return NextResponse.json({ error: "Certificate not found." }, { status: 404 })
+        }
+
+        if (!cert.storage_path) {
+          return NextResponse.json({ error: "Certificate PDF not available." }, { status: 400 })
+        }
+
+        if (!cert.user_id) {
+          return NextResponse.json({ error: "Certificate has no associated user." }, { status: 400 })
+        }
+
+        // Check current email status
+        if (cert.email_status === "sending") {
+          return NextResponse.json({ error: "Certificate email is already being sent. Please wait." }, { status: 409 })
+        }
+        if (cert.email_status === "sent") {
+          return NextResponse.json({ error: "Certificate email has already been sent successfully." }, { status: 409 })
+        }
+
+        // Get learner email
+        const { data: profile, error: profileError } = await adminClient
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", cert.user_id)
+          .maybeSingle()
+
+        if (profileError || !profile?.email) {
+          return NextResponse.json({ error: "Learner email not found." }, { status: 400 })
+        }
+
+        // Download PDF from storage
+        const { data: fileData, error: downloadError } = await adminClient.storage
+          .from("certificates")
+          .download(cert.storage_path)
+
+        if (downloadError || !fileData) {
+          logError("certificate.pdf_download_failed", downloadError, { certificateId: id })
+          return NextResponse.json({ error: "Certificate PDF could not be downloaded." }, { status: 503 })
+        }
+
+        const pdfBuffer = Buffer.from(await fileData.arrayBuffer())
+
+        // Build verification URL
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+        if (!siteUrl) {
+          return NextResponse.json({ error: "Site URL not configured." }, { status: 503 })
+        }
+        const verificationUrl = new URL("/verify", siteUrl)
+        verificationUrl.searchParams.set("code", cert.verification_code)
+
+        // Send email with PDF attachment using atomic claiming
+        // Use stable idempotency key per certificate (not per retry attempt)
+        try {
+          await claimAndSendCertificateEmail(adminClient, {
+            certificateId: id,
+            to: profile.email,
+            recipientName: cert.recipient_name,
+            courseTitle: cert.course_title,
+            certificateNumber: cert.certificate_number,
+            verificationUrl: verificationUrl.toString(),
+            pdfBuffer,
+            idempotencyKey: `cert-retry-${id}`,
+          })
+
+          return NextResponse.json({ success: true, message: "Certificate email resent successfully." })
+        } catch (emailError) {
+          // claimAndSendCertificateEmail already updates status to failed
+          logError("certificate.email_resend_failed", emailError, { certificateId: id })
+          return NextResponse.json(
+            { error: "Failed to send certificate email. Please try again." },
+            { status: 503 }
+          )
+        }
+      }
+
       case "grade_attempt_answer": {
         const { attempt_id, question_id, points, feedback } = payload
 
@@ -1168,7 +1262,7 @@ async function handleAdminAction(
           return NextResponse.json({ error: "Role not found" }, { status: 400 })
         }
 
-        const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
+        const { data: authData, error: authError } = await (adminSupabase.auth as any).admin.createUser({
           email: email.trim().toLowerCase(),
           password,
           email_confirm: true,

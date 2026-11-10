@@ -688,6 +688,12 @@ export interface Database {
           grade: string | null
           is_valid: boolean
           created_at: string
+          email_status: string | null
+          email_sent_at: string | null
+          email_error: string | null
+          email_retry_count: number | null
+          email_lease_token: string | null
+          email_lease_acquired_at: string | null
         }
         Insert: {
           id?: string
@@ -702,6 +708,12 @@ export interface Database {
           grade?: string | null
           is_valid?: boolean
           created_at?: string
+          email_status?: string | null
+          email_sent_at?: string | null
+          email_error?: string | null
+          email_retry_count?: number | null
+          email_lease_token?: string | null
+          email_lease_acquired_at?: string | null
         }
         Update: {
           id?: string
@@ -716,6 +728,12 @@ export interface Database {
           grade?: string | null
           is_valid?: boolean
           created_at?: string
+          email_status?: string | null
+          email_sent_at?: string | null
+          email_error?: string | null
+          email_retry_count?: number | null
+          email_lease_token?: string | null
+          email_lease_acquired_at?: string | null
         }
         Relationships: [
           {

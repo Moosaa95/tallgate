@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth/guards"
 import { isSupabaseConfigured } from "@/lib/supabase/server"
+import { isCloudinaryConfigured } from "@/lib/storage/cloudinary"
 import { siteConfig } from "@/lib/config/site"
 
 export const metadata = {
@@ -25,6 +26,11 @@ export default async function AdminSettingsPage() {
       label: "Supabase service role",
       configured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
       detail: "Required for admin actions, certificate issuance, and server-side rate limiting.",
+    },
+    {
+      label: "Cloudinary media storage",
+      configured: isCloudinaryConfigured(),
+      detail: "Handles course videos and document uploads, offloading storage from Supabase to Cloudinary CDN.",
     },
     {
       label: "Public site URL",
@@ -78,7 +84,7 @@ export default async function AdminSettingsPage() {
                 className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
                   item.configured
                     ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border-amber-200 bg-amber-50 text-amber-900"
+                    : "border-slate-200 bg-slate-50 text-slate-600"
                 }`}
               >
                 {item.configured ? "Configured" : "Not configured"}
@@ -86,11 +92,24 @@ export default async function AdminSettingsPage() {
             </li>
           ))}
         </ul>
-        <p className="mt-4 text-xs text-slate-500">
-          These values come from environment variables. Update them in your hosting provider
-          (or `.env.local` in development) and redeploy to change them. Contact information shown
-          across the site comes from the shared site config ({siteConfig.supportEmail}).
-        </p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <h2 className="text-sm font-bold text-slate-900">Platform defaults</h2>
+        <dl className="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Platform name
+            </dt>
+            <dd className="mt-0.5 text-slate-900">{siteConfig.name}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Support email
+            </dt>
+            <dd className="mt-0.5 text-slate-900">{siteConfig.supportEmail}</dd>
+          </div>
+        </dl>
       </div>
     </div>
   )

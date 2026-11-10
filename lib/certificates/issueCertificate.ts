@@ -478,50 +478,42 @@ interface ClaimAndSendEmailInput {
  * Atomically claims a certificate for email delivery and sends it.
  * Uses a UUID lease token for ownership tracking to prevent duplicate sends
  * and lease theft. Separate lease acquisition timestamp from delivery timestamp.
+ * Uses SECURITY DEFINER functions for atomic lease management.
  */
 export async function claimAndSendCertificateEmail(
   client: ReturnType<typeof createAdminClient>,
   input: ClaimAndSendEmailInput
 ): Promise<void> {
   const { certificateId, to, recipientName, courseTitle, certificateNumber, verificationUrl, pdfBuffer } = input
-  const now = new Date().toISOString()
   const leaseToken = crypto.randomUUID()
 
-  // Try to claim the certificate for sending by updating status from 'pending' or 'failed' to 'sending'
-  // Atomically set lease token and lease acquisition timestamp
-  // Only claim if not already 'sending' or 'sent', and if 'failed' allow retry
-  const { data: claimed, error: claimError } = await client
-    .from("certificates")
-    .update({
-      email_status: "sending",
-      email_lease_token: leaseToken,
-      email_lease_acquired_at: now,
-      email_error: null,
+  // Atomically claim the lease using SECURITY DEFINER function
+  const { data: claimResult, error: claimError } = await (client as any)
+    .rpc('claim_certificate_email_lease', {
+      p_certificate_id: certificateId,
+      p_lease_token: leaseToken,
+      p_lease_timeout: '5 minutes',
     })
-    .eq("id", certificateId)
-    .in("email_status", ["pending", "failed"]) // Only claim if not already sending/sent
-    .select("id, email_status, email_retry_count, email_lease_token")
-    .maybeSingle()
 
   if (claimError) {
     logError("certificate.email_claim_failed", claimError, { certificateId })
     throw new Error("Failed to claim certificate for email delivery")
   }
 
-  if (!claimed) {
+  const claimed = claimResult?.[0]
+  if (!claimed?.claimed) {
     // Another process already claimed it or it's already sent
-    const { data: current } = await client
-      .from("certificates")
-      .select("email_status, email_retry_count")
-      .eq("id", certificateId)
-      .maybeSingle()
-    logWarn("certificate.email_already_claimed", { certificateId, currentStatus: current?.email_status })
+    logWarn("certificate.email_already_claimed", { 
+      certificateId, 
+      currentStatus: claimed?.current_status,
+      currentLeaseToken: claimed?.current_lease_token 
+    })
     return // Not an error, just already handled
   }
 
   // Verify we got the lease token we expected (defense in depth)
-  if (claimed.email_lease_token !== leaseToken) {
-    logWarn("certificate.lease_token_mismatch_on_claim", { certificateId, expected: leaseToken, actual: claimed.email_lease_token })
+  if (claimed.current_lease_token !== leaseToken) {
+    logWarn("certificate.lease_token_mismatch_on_claim", { certificateId, expected: leaseToken, actual: claimed.current_lease_token })
     return
   }
 
@@ -538,41 +530,35 @@ export async function claimAndSendCertificateEmail(
     })
 
     // Mark as sent - require matching lease token to prevent lease theft
-    const newRetryCount = (claimed.email_retry_count ?? 0) + 1
-    const { error: sentError } = await client
-      .from("certificates")
-      .update({
-        email_status: "sent",
-        email_sent_at: new Date().toISOString(), // This is now ONLY for successful delivery timestamp
-        email_lease_token: null, // Clear lease token on completion
-        email_lease_acquired_at: null, // Clear lease acquisition timestamp
-        email_error: null,
-        email_retry_count: newRetryCount,
+    const { data: completed, error: completeError } = await (client as any)
+      .rpc('complete_certificate_email_lease', {
+        p_certificate_id: certificateId,
+        p_lease_token: leaseToken,
+        p_email_status: 'sent',
+        p_email_error: null,
       })
-      .eq("id", certificateId)
-      .eq("email_lease_token", leaseToken) // Ensure we still own the lease
 
-    if (sentError) {
-      logError("certificate.email_status_update_failed", sentError, { certificateId })
+    if (completeError) {
+      logError("certificate.email_status_update_failed", completeError, { certificateId })
       // Status update failed but email was sent - log and continue
+    } else if (!completed) {
+      logWarn("certificate.lease_lost_before_completion", { certificateId, leaseToken })
+      // Lease was lost (stale release or another process) but email was sent
     }
   } catch (emailError) {
-    // Email sending failed, mark as failed and release lease - require matching lease token
-    const newRetryCount = (claimed.email_retry_count ?? 0) + 1
-    const { error: failedError } = await client
-      .from("certificates")
-      .update({
-        email_status: "failed",
-        email_lease_token: null, // Release lease token
-        email_lease_acquired_at: null, // Release lease acquisition timestamp
-        email_error: String(emailError),
-        email_retry_count: newRetryCount,
+    // Email sending failed, mark as failed - require matching lease token
+    const { data: failed, error: failedError } = await (client as any)
+      .rpc('complete_certificate_email_lease', {
+        p_certificate_id: certificateId,
+        p_lease_token: leaseToken,
+        p_email_status: 'failed',
+        p_email_error: String(emailError),
       })
-      .eq("id", certificateId)
-      .eq("email_lease_token", leaseToken)
 
     if (failedError) {
       logError("certificate.email_failed_update_failed", failedError, { certificateId })
+    } else if (!failed) {
+      logWarn("certificate.lease_lost_before_failure", { certificateId, leaseToken })
     }
     throw emailError // Re-throw for caller to handle
   }
@@ -580,7 +566,7 @@ export async function claimAndSendCertificateEmail(
 
 /**
  * Releases stale 'sending' leases (older than EMAIL_LEASE_TIMEOUT_MS).
- * Only releases leases where the token matches (ownership verification).
+ * Uses SECURITY DEFINER function for atomic lease release.
  * Should be called periodically or before retry attempts.
  */
 export async function releaseStaleEmailLeases(): Promise<number> {
@@ -592,24 +578,15 @@ export async function releaseStaleEmailLeases(): Promise<number> {
     return 0
   }
 
-  const leaseCutoff = new Date(Date.now() - EMAIL_LEASE_TIMEOUT_MS).toISOString()
-  
-  const { data, error } = await client
-    .from("certificates")
-    .update({
-      email_status: "pending",
-      email_lease_token: null,
-      email_lease_acquired_at: null,
-      email_error: "Email lease expired, retry available",
+  const { data, error } = await (client as any)
+    .rpc('release_stale_certificate_email_leases', {
+      p_lease_timeout_interval: '5 minutes',
     })
-    .eq("email_status", "sending")
-    .lt("email_lease_acquired_at", leaseCutoff)
-    .select("id")
 
   if (error) {
     logError("certificate.stale_lease_release_failed", error)
     return 0
   }
 
-  return data?.length ?? 0
+  return (data as number) ?? 0
 }

@@ -955,6 +955,7 @@ async function handleAdminAction(
         verificationUrl.searchParams.set("code", cert.verification_code)
 
         // Send email with PDF attachment using atomic claiming
+        // Use stable idempotency key per certificate (not per retry attempt)
         try {
           await claimAndSendCertificateEmail(adminClient, {
             certificateId: id,
@@ -964,7 +965,7 @@ async function handleAdminAction(
             certificateNumber: cert.certificate_number,
             verificationUrl: verificationUrl.toString(),
             pdfBuffer,
-            idempotencyKey: `cert-retry-${id}-${cert.email_retry_count ?? 0}`,
+            idempotencyKey: `cert-retry-${id}`,
           })
 
           return NextResponse.json({ success: true, message: "Certificate email resent successfully." })

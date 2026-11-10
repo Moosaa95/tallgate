@@ -1,9 +1,11 @@
--- Manual issuance duplicate prevention and email lease ownership
+-- Manual issuance duplicate prevention and email lease ownership (FIXED)
 -- Adds partial unique index for (user_id, course_title, issue_date) where course_id IS NULL
 -- Adds lease token and separate lease acquisition timestamp for email delivery ownership
 -- Safe to apply on existing data
+-- FIX: Preflight check now raises EXCEPTION if duplicates exist, stopping migration
 
 -- 1. Report any existing duplicate (user_id, course_title, issue_date) combinations for manual issuance
+-- This will FAIL the migration if duplicates are found, with actionable diagnostic info
 DO $$
 DECLARE
     dup_count integer;
@@ -19,8 +21,8 @@ BEGIN
     ) dups;
     
     IF dup_count > 0 THEN
-        RAISE NOTICE 'Found % duplicate (user_id, course_title, issue_date) combinations for manual issuance. Constraint will fail.', dup_count;
         -- Log the duplicates for manual review
+        RAISE NOTICE 'Found % duplicate (user_id, course_title, issue_date) combinations for manual issuance. Migration will fail.', dup_count;
         RAISE NOTICE 'Duplicates:';
         FOR dup IN (
             SELECT user_id, course_title, issue_date, count(*) as cnt, array_agg(id) as cert_ids
@@ -31,6 +33,8 @@ BEGIN
         ) LOOP
             RAISE NOTICE '  user_id: %, course_title: %, issue_date: %, count: %, cert_ids: %', dup.user_id, dup.course_title, dup.issue_date, dup.cnt, dup.cert_ids;
         END LOOP;
+        -- EXPLICITLY FAIL THE MIGRATION - duplicates must be resolved manually first
+        RAISE EXCEPTION 'Cannot create unique index: % duplicate (user_id, course_title, issue_date) combinations found for manual issuance. Resolve duplicates manually before applying this migration.', dup_count;
     ELSE
         RAISE NOTICE 'No duplicate (user_id, course_title, issue_date) combinations found for manual issuance. Safe to add constraint.';
     END IF;
@@ -56,6 +60,6 @@ CREATE INDEX IF NOT EXISTS idx_certificates_email_sending_stale
 ON public.certificates (email_lease_acquired_at)
 WHERE email_status = 'sending';
 
--- 6. Grant permissions for new columns
-GRANT SELECT, UPDATE (email_lease_token, email_lease_acquired_at)
-ON public.certificates TO authenticated;
+-- 6. NO GRANTS to authenticated for email/lease columns
+-- Mutations are done via service role (admin client) which bypasses RLS
+-- SECURITY DEFINER functions in 20261110160000_certificate_permissions_fix.sql handle authorized operations

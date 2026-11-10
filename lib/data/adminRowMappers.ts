@@ -31,6 +31,10 @@ export type AdminCertificate = {
   storage_path: string | null
   user_id: string | null
   created_at: string
+  email_status: string | null
+  email_sent_at: string | null
+  email_error: string | null
+  email_retry_count: number | null
 }
 
 export function toConsultation(row: ConsultationRow): MockConsultation {
@@ -100,6 +104,10 @@ export function toCertificate(row: CertificateRow): AdminCertificate {
     storage_path: row.storage_path,
     user_id: row.user_id,
     created_at: row.created_at,
+    email_status: row.email_status ?? null,
+    email_sent_at: row.email_sent_at ?? null,
+    email_error: row.email_error ?? null,
+    email_retry_count: row.email_retry_count ?? null,
   }
 }
 

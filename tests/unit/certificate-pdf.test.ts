@@ -6,6 +6,7 @@ describe("renderCertificatePdf", () => {
     const buffer = await renderCertificatePdf({
       recipient_name: "Fixture Recipient For Rendering Smoke Test",
       course_title: "Fixture Programme Title - Rendering Smoke Test",
+      course_description: "This is a test course description for the fixture programme.",
       issue_date: "2026-03-09",
       grade: "Distinction",
       certificate_number: "TG/DH/01021/26",
@@ -27,6 +28,7 @@ describe("renderCertificatePdf", () => {
       recipient_name: "Dr. Bartholomew Alexander Montgomery-Finch the Third",
       course_title:
         "Advanced Executive Postgraduate Diploma in Healthcare Information Systems, Telemedicine Technologies, and Health Data Governance",
+      course_description: "A comprehensive programme covering healthcare information systems, telemedicine technologies, and health data governance for modern healthcare professionals.",
       issue_date: "2026-10-15",
       grade: null,
       certificate_number: "TG/DH/01099/26",
@@ -45,6 +47,7 @@ describe("renderCertificatePdf", () => {
     const buffer = await renderCertificatePdf({
       recipient_name: "Jane Doe",
       course_title: "Professional Telehealth & Digital Health Training Programme",
+      course_description: "Professional training in telehealth and digital health technologies.",
       issue_date: "2026-10-15",
       grade: "Distinction",
       certificate_number: "TG/DH/01021/21",

@@ -1,3 +1,10 @@
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const fontkitPath = path.resolve(__dirname, "node_modules/fontkit/dist/main.cjs");
+const fontkitDir = path.resolve(__dirname, "node_modules/fontkit");
+
 /**
  * Content Security Policy.
  *
@@ -98,6 +105,13 @@ const nextConfig = {
 
     // Modify the file loader rule to ignore *.svg, since we have it handled now.
     fileLoaderRule.exclude = /\.svg$/i;
+
+    // Fix @react-pdf/font fontkit resolution issue - redirect all fontkit imports to root fontkit
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "fontkit$": fontkitPath,
+      "fontkit/": fontkitPath.replace("/dist/main.cjs", "/"),
+    };
 
     return config;
   },

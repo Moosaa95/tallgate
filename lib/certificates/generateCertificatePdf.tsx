@@ -14,12 +14,15 @@ import {
   renderToBuffer,
 } from '@react-pdf/renderer'
 import type { ReactElement } from 'react'
+import { readFile } from 'fs/promises'
+import path from 'path'
 import { siteConfig } from '@/lib/config/site'
 import { formatCertificateIssueDate } from '@/lib/certificates/date'
 
 export interface CertificateData {
   recipient_name: string
   course_title: string
+  course_description: string
   issue_date: string
   grade: string | null
   certificate_number: string
@@ -40,6 +43,18 @@ const SLATE_LIGHT = '#94A3B8'
 const PAGE_WIDTH = 841.89
 const PAGE_HEIGHT = 595.28
 
+async function loadImageAsDataUrl(filename: string): Promise<string | undefined> {
+  try {
+    const filePath = path.join(process.cwd(), 'public', 'assets', filename)
+    const buffer = await readFile(filePath)
+    const ext = path.extname(filename).slice(1)
+    const mime = ext === 'svg' ? 'image/svg+xml' : `image/${ext}`
+    return `data:${mime};base64,${buffer.toString('base64')}`
+  } catch {
+    return undefined
+  }
+}
+
 const styles = StyleSheet.create({
   page: {
     width: PAGE_WIDTH,
@@ -57,205 +72,212 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    paddingHorizontal: 48,
-    paddingTop: 36,
-    paddingBottom: 28,
+    paddingHorizontal: 60,
+    paddingTop: 40,
+    paddingBottom: 40,
     flexDirection: 'column',
     justifyContent: 'space-between',
   },
   certNumberRow: {
     position: 'absolute',
-    top: 36,
-    right: 50,
+    top: 40,
+    right: 60,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   certNumberText: {
     fontFamily: 'Times-Roman',
-    fontSize: 9.5,
+    fontSize: 10,
     color: NAVY,
     letterSpacing: 0.3,
   },
   certNumberDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: GOLD,
-    marginLeft: 3,
+    marginLeft: 4,
   },
   header: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
+    marginTop: 8,
   },
   brandMark: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
   },
   companyName: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 13.5,
-    letterSpacing: 2.8,
+    fontSize: 15,
+    letterSpacing: 3,
     color: NAVY,
     textTransform: 'uppercase',
-    marginTop: 5,
+    marginTop: 6,
   },
   rcLine: {
     fontFamily: 'Helvetica',
-    fontSize: 7.5,
-    letterSpacing: 1.2,
+    fontSize: 8,
+    letterSpacing: 1.5,
     color: SLATE_DARK,
-    marginTop: 2,
+    marginTop: 3,
   },
   body: {
     alignItems: 'center',
     justifyContent: 'center',
     flexGrow: 1,
-    marginTop: 6,
+    marginTop: 10,
   },
   mainHeading: {
     fontFamily: 'Times-Bold',
-    fontSize: 25.5,
-    letterSpacing: 2.5,
+    fontSize: 28,
+    letterSpacing: 3,
     color: NAVY,
     textTransform: 'uppercase',
     textAlign: 'center',
   },
   presentedTo: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 8.5,
-    letterSpacing: 2.2,
+    fontSize: 9.5,
+    letterSpacing: 2.5,
     color: GOLD,
     textTransform: 'uppercase',
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: 12,
   },
   recipientName: {
     fontFamily: 'Times-Bold',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     color: NAVY,
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 4,
-    paddingHorizontal: 24,
+    marginTop: 10,
+    marginBottom: 6,
+    paddingHorizontal: 30,
   },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 250,
-    marginTop: 4,
-    marginBottom: 8,
+    width: 280,
+    marginTop: 6,
+    marginBottom: 10,
   },
   dividerLine: {
     flex: 1,
-    height: 1,
+    height: 1.5,
     backgroundColor: GOLD,
   },
   dividerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: GOLD,
-    marginHorizontal: 8,
+    marginHorizontal: 10,
   },
   completionIntro: {
     fontFamily: 'Helvetica',
-    fontSize: 10.5,
+    fontSize: 11.5,
     color: SLATE_DARK,
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: 4,
   },
   courseTitle: {
     fontFamily: 'Helvetica-Bold',
     color: NAVY,
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 3,
-    maxWidth: 560,
-    lineHeight: 1.3,
+    marginTop: 6,
+    marginBottom: 4,
+    maxWidth: 600,
+    lineHeight: 1.35,
   },
-  completionCitation: {
+  courseDescription: {
     fontFamily: 'Helvetica',
-    fontSize: 10,
+    fontSize: 10.5,
     color: SLATE_DARK,
     textAlign: 'center',
-    lineHeight: 1.35,
-    maxWidth: 520,
+    lineHeight: 1.45,
+    maxWidth: 560,
+    marginTop: 2,
+    marginBottom: 4,
   },
   gradeCitation: {
-    fontFamily: 'Helvetica',
-    fontSize: 9.5,
+    fontFamily: 'Helvetica-Bold',
+    fontSize: 10.5,
     color: SLATE,
     textAlign: 'center',
-    marginTop: 3,
+    marginTop: 6,
   },
   dateBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: NAVY,
-    borderWidth: 1.2,
+    borderWidth: 1.5,
     borderColor: GOLD,
     borderRadius: 999,
-    paddingHorizontal: 20,
-    paddingVertical: 5.5,
-    marginTop: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 7,
+    marginTop: 14,
   },
   dateBadgeText: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 8.5,
-    letterSpacing: 0.8,
+    fontSize: 9.5,
+    letterSpacing: 1,
     color: GOLD_LIGHT,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'flex-end',
     width: '100%',
-    paddingHorizontal: 54,
-    marginBottom: 10,
+    paddingHorizontal: 70,
+    marginBottom: 20,
+    marginTop: 20,
   },
   signerColumn: {
     alignItems: 'center',
-    width: 170,
+    width: 190,
+  },
+  signatureImage: {
+    width: 160,
+    height: 60,
+    marginBottom: 6,
   },
   signerLine: {
-    width: 140,
+    width: 160,
     height: 1,
     backgroundColor: SLATE_LIGHT,
     marginBottom: 6,
   },
   signerRole: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 9,
+    fontSize: 9.5,
     color: NAVY,
     textAlign: 'center',
   },
   signerOrg: {
     fontFamily: 'Helvetica',
-    fontSize: 8.5,
+    fontSize: 9,
     color: NAVY,
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: 3,
   },
   qrColumn: {
     alignItems: 'center',
-    width: 130,
-    marginTop: -4,
+    width: 140,
   },
   qrImage: {
-    width: 64,
-    height: 64,
+    width: 72,
+    height: 72,
   },
   qrCaption: {
     fontFamily: 'Helvetica',
-    fontSize: 7.5,
-    letterSpacing: 0.3,
+    fontSize: 8,
+    letterSpacing: 0.4,
     color: SLATE_DARK,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 5,
   },
 })
 
@@ -386,7 +408,7 @@ function CertificateBackground(): ReactElement {
 
 function TallGateMark(): ReactElement {
   return (
-    <Svg width={34} height={34} viewBox="0 0 48 48">
+    <Svg width={40} height={40} viewBox="0 0 48 48">
       {/* Outer Viewfinder Corner Brackets */}
       <Path d="M2 14V4C2 2.89543 2.89543 2 4 2H14" stroke={NAVY} strokeWidth={3.2} strokeLinecap="round" fill="none" />
       <Path d="M34 2H44C45.1046 2 46 2.89543 46 4V14" stroke={NAVY} strokeWidth={3.2} strokeLinecap="round" fill="none" />
@@ -408,7 +430,7 @@ function TallGateMark(): ReactElement {
 
 function ShieldCheckIcon(): ReactElement {
   return (
-    <Svg width={11} height={11} viewBox="0 0 24 24" style={{ marginRight: 6 }}>
+    <Svg width={12} height={12} viewBox="0 0 24 24" style={{ marginRight: 7 }}>
       <Path
         d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"
         fill="none"
@@ -429,8 +451,12 @@ function ShieldCheckIcon(): ReactElement {
 
 export function CertificateDocument({
   data,
+  trainingCoordinatorSig,
+  programmeDirectorSig,
 }: {
   data: CertificateData
+  trainingCoordinatorSig: string
+  programmeDirectorSig: string
 }): ReactElement {
   const nameLen = data.recipient_name?.length || 0
   const nameFontSize = nameLen > 32 ? 26 : nameLen > 24 ? 30 : 36
@@ -438,7 +464,8 @@ export function CertificateDocument({
   const courseLen = data.course_title?.length || 0
   const courseFontSize = courseLen > 65 ? 12 : courseLen > 45 ? 13.5 : 15
 
-  const isHealthCourse = /health|telehealth|medical|clinical/i.test(data.course_title)
+  const descriptionLen = data.course_description?.length || 0
+  const descriptionFontSize = descriptionLen > 200 ? 9.5 : descriptionLen > 120 ? 10 : 10.5
 
   return (
     <Document
@@ -490,16 +517,13 @@ export function CertificateDocument({
             <Text style={[styles.courseTitle, { fontSize: courseFontSize }]}>
               {data.course_title}
             </Text>
-            <Text style={styles.completionCitation}>
-              and demonstrating commitment to developing practical
-            </Text>
-            <Text style={styles.completionCitation}>
-              {isHealthCourse
-                ? 'knowledge and skills in digital healthcare'
-                : 'knowledge and skills in digital technology'}
-            </Text>
+            {data.course_description && (
+              <Text style={[styles.courseDescription, { fontSize: descriptionFontSize }]}>
+                {data.course_description}
+              </Text>
+            )}
             {data.grade ? (
-              <Text style={styles.gradeCitation}>awarded with the standing of {data.grade}</Text>
+              <Text style={styles.gradeCitation}>Awarded with the standing of {data.grade}</Text>
             ) : null}
 
             {/* Issue Date Badge */}
@@ -514,18 +538,18 @@ export function CertificateDocument({
           {/* Footer: Signatures & QR Code */}
           <View style={styles.footer}>
             <View style={styles.signerColumn}>
-              <View style={styles.signerLine} />
+              <PdfImage src={trainingCoordinatorSig} style={styles.signatureImage} />
               <Text style={styles.signerRole}>Training Coordinator</Text>
               <Text style={styles.signerOrg}>Tallgate Limited</Text>
             </View>
 
             <View style={styles.qrColumn}>
               <PdfImage src={data.qr_data_url} style={styles.qrImage} />
-              <Text style={styles.qrCaption}>scan to verify certificate</Text>
+              <Text style={styles.qrCaption}>Scan to verify certificate</Text>
             </View>
 
             <View style={styles.signerColumn}>
-              <View style={styles.signerLine} />
+              <PdfImage src={programmeDirectorSig} style={styles.signatureImage} />
               <Text style={styles.signerRole}>Programme Director</Text>
               <Text style={styles.signerOrg}>Tallgate Limited</Text>
             </View>
@@ -537,5 +561,22 @@ export function CertificateDocument({
 }
 
 export async function renderCertificatePdf(data: CertificateData): Promise<Buffer> {
-  return renderToBuffer(<CertificateDocument data={data} />)
+  const [trainingCoordinatorSig, programmeDirectorSig, logoSrc] = await Promise.all([
+    loadImageAsDataUrl('signature-training-coordinator.png'),
+    loadImageAsDataUrl('signature-programme-director.png'),
+    data.logo_src ? Promise.resolve(data.logo_src) : loadImageAsDataUrl('tallgate-logo.png'),
+  ])
+
+  const documentData = {
+    ...data,
+    logo_src: logoSrc,
+  }
+
+  return renderToBuffer(
+    <CertificateDocument
+      data={documentData}
+      trainingCoordinatorSig={trainingCoordinatorSig || ''}
+      programmeDirectorSig={programmeDirectorSig || ''}
+    />
+  )
 }

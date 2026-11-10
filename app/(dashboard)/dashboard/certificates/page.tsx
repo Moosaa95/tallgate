@@ -2,7 +2,7 @@ import Link from "next/link"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { requireUser } from "@/lib/auth/guards"
 import { formatCertificateIssueDate } from "@/lib/certificates/date"
-import { HiOutlineIdentification } from "react-icons/hi2"
+import { HiOutlineIdentification, HiOutlineArrowDownTray } from "react-icons/hi2"
 import { logError } from "@/lib/logging/logger"
 
 export const metadata = {
@@ -18,6 +18,7 @@ type LearnerCertificate = {
   issue_date: string
   grade: string | null
   is_valid: boolean
+  storage_path: string | null
 }
 
 export default async function DashboardCertificatesPage() {
@@ -30,7 +31,7 @@ export default async function DashboardCertificatesPage() {
       const supabase = await createClient()
       const { data, error } = await supabase
         .from("certificates")
-        .select("id, certificate_number, verification_code, course_title, issue_date, grade, is_valid")
+        .select("id, certificate_number, verification_code, course_title, issue_date, grade, is_valid, storage_path")
         .eq("user_id", user.id)
         .order("issue_date", { ascending: false })
 
@@ -105,12 +106,23 @@ export default async function DashboardCertificatesPage() {
                   </p>
                 </div>
               </div>
+              <div className="flex flex-wrap gap-2">
               <Link
                 href={`/verify?code=${encodeURIComponent(certificate.verification_code)}`}
                 className="btn-secondary-light text-xs self-start"
               >
                 View verification
               </Link>
+              {certificate.storage_path && (
+                <Link
+                  href={`/api/certificates/${certificate.id}/download`}
+                  className="btn-secondary-light text-xs self-start flex items-center gap-1"
+                >
+                  <HiOutlineArrowDownTray className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </Link>
+              )}
+            </div>
             </div>
           ))}
         </div>

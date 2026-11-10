@@ -13,7 +13,10 @@ import {
   HiOutlineArrowTopRightOnSquare,
   HiOutlineArrowDownTray,
   HiOutlineXMark,
+  HiOutlineArrowPath,
+  HiOutlineExclamationCircle,
 } from "react-icons/hi2"
+import { HiMail } from "react-icons/hi"
 
 export default function CertificatesClient({
   initialCertificates,
@@ -167,6 +170,45 @@ export default function CertificatesClient({
     }
   }
 
+  const resendCertificateEmail = async (cert: AdminCertificate) => {
+    setRequestError("")
+
+    try {
+      const response = await fetch("/api/admin/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "resend_certificate_email",
+          payload: { id: cert.id },
+        }),
+      })
+      const result = (await response.json()) as { error?: string; success?: boolean }
+      if (!response.ok) {
+        throw new Error(result.error || "Email could not be resent.")
+      }
+      setCertificates((previous) =>
+        previous.map((item) =>
+          item.id === cert.id
+            ? {
+                ...item,
+                email_status: "sent",
+                email_sent_at: new Date().toISOString(),
+                email_error: null,
+                email_retry_count: (item.email_retry_count ?? 0) + 1,
+              }
+            : item
+        )
+      )
+      setRequestError("Certificate email resent successfully.")
+      setTimeout(() => setRequestError(""), 5000)
+    } catch (error) {
+      console.error("Error resending certificate email:", error)
+      setRequestError(
+        error instanceof Error ? error.message : "Email could not be resent."
+      )
+    }
+  }
+
   return (
     <div className="space-y-6">
       {dataWarning && (
@@ -280,6 +322,7 @@ export default function CertificatesClient({
                     <th className="px-6 py-4">Issue Date</th>
                     <th className="px-6 py-4">Grade</th>
                     <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Email Status</th>
                     <th className="px-6 py-4 text-right">Verification</th>
                   </tr>
                 </thead>
@@ -326,6 +369,48 @@ export default function CertificatesClient({
                         >
                           {cert.is_valid ? "Valid" : "Revoked"}
                         </button>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        {cert.email_status === "sent" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                            <HiMail className="w-3 h-3" />
+                            <span>Sent</span>
+                          </span>
+                        )}
+                        {cert.email_status === "sending" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                            <HiOutlineArrowPath className="w-3 h-3 animate-spin" />
+                            <span>Sending...</span>
+                          </span>
+                        )}
+                        {cert.email_status === "failed" && (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                              <HiOutlineExclamationCircle className="w-3 h-3" />
+                              <span>Failed</span>
+                            </span>
+                            {cert.email_retry_count !== null && cert.email_retry_count < 3 && (
+                              <button
+                                onClick={() => resendCertificateEmail(cert)}
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 hover:bg-amber-100 transition-colors"
+                                title="Resend certificate email"
+                              >
+                                <HiOutlineArrowPath className="w-3 h-3" />
+                                <span>Retry</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {cert.email_status === "pending" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                            <HiMail className="w-3 h-3" />
+                            <span>Pending</span>
+                          </span>
+                        )}
+                        {!cert.email_status && (
+                          <span className="text-[10px] text-slate-400">—</span>
+                        )}
                       </td>
 
                       <td className="px-6 py-4 text-right">
